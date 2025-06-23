@@ -72,7 +72,7 @@ E-Matdaan is a secure and verifiable electronic voting system that ensures vote 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/ematdaan.git
+   git clone https://github.com/PushkarPisolkar04/ematdaan.git
    cd ematdaan
    ```
 
