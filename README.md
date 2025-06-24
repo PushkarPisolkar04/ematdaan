@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![E-Matdaan Logo](public/logo.png)
+<img src="public/logo.png" alt="E-Matdaan Logo" width="100" height="100">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
