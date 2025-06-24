@@ -222,4 +222,17 @@ export const getPastElections = async () => {
     console.error('Error fetching past elections:', error);
     return [];
   }
+};
+
+export const calculateProgress = (startTime: string, endTime: string): number => {
+  const start = new Date(startTime).getTime();
+  const end = new Date(endTime).getTime();
+  const now = new Date().getTime();
+  
+  if (now < start) return 0;
+  if (now > end) return 100;
+  
+  const total = end - start;
+  const elapsed = now - start;
+  return Math.round((elapsed / total) * 100);
 }; 
