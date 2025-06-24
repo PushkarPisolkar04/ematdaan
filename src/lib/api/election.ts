@@ -224,15 +224,15 @@ export const getPastElections = async () => {
   }
 };
 
-export const calculateProgress = (startTime: string, endTime: string): number => {
-  const start = new Date(startTime).getTime();
-  const end = new Date(endTime).getTime();
-  const now = new Date().getTime();
-  
-  if (now < start) return 0;
-  if (now > end) return 100;
-  
-  const total = end - start;
-  const elapsed = now - start;
-  return Math.round((elapsed / total) * 100);
+export const getElectionProgress = (startTime: string, endTime: string): number => {
+  const startMs = new Date(startTime).valueOf();
+  const endMs = new Date(endTime).valueOf();
+  const nowMs = Date.now();
+
+  if (nowMs < startMs) return 0;
+  if (nowMs > endMs) return 100;
+
+  const totalMs = endMs - startMs;
+  const elapsedMs = nowMs - startMs;
+  return Math.round((elapsedMs / totalMs) * 100);
 }; 

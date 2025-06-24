@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { connectMetaMask, disconnectMetaMask, getCurrentAddress } from '@/lib/metamask';
 import { generateDID } from '@/lib/did';
 import { sendOTP, verifyOTP } from '@/lib/otp';
+import { supabase } from '@/lib/supabase';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -16,6 +17,7 @@ export interface AuthState {
 interface AuthUser {
   id: string;
   email: string;
+  address: string;
   // Add other user properties as needed
 }
 
@@ -367,6 +369,23 @@ export const useAuth = () => {
     }
   }, []);
 
+  const handleLogin = async (userData: AuthUser) => {
+    try {
+      // Your existing code using userData.id
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userData.id)
+        .single();
+
+      if (error) throw error;
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  };
+
   return {
     authState,
     connect,
@@ -376,5 +395,6 @@ export const useAuth = () => {
     verifyLogin,
     logout,
     checkAuth,
+    handleLogin,
   };
 }; 

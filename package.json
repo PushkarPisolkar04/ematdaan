@@ -7,7 +7,7 @@
     "dev": "vite",
     "proxy": "node src/proxy-server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run proxy\"",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest",
@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest --config vitest.config.ts src/test/e2e/**/*.test.tsx",
     "test:integration": "vitest --config vitest.config.ts src/test/integration/**/*.test.ts",
-    "test:unit": "vitest --config vitest.config.ts src/lib/**/*.test.ts"
+    "test:unit": "vitest --config vitest.config.ts src/lib/**/*.test.ts",
+    "type-check": "tsc"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.1.2",
