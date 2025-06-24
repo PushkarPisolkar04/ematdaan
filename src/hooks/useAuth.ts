@@ -13,6 +13,12 @@ export interface AuthState {
   isAdmin: boolean;
 }
 
+interface AuthUser {
+  id: string;
+  email: string;
+  // Add other user properties as needed
+}
+
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
