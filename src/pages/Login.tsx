@@ -12,7 +12,8 @@ import {
   registerUser,
   loginUser,
   verifyUserEmail,
-  getUserOrganizations
+  getUserOrganizations,
+  createSession
 } from '@/lib/api/traditionalAuth';
 import { verifyOTP, sendOTP } from '@/lib/otp';
 import { supabase } from '@/lib/supabase';
@@ -175,9 +176,24 @@ const Login = () => {
       if (result.otpSent) {
         setShowOTP(true);
         setTimeLeft(300); // 5 minutes
+        
+        // Store access codes and user info in location state for later display
+        if (result.accessCodes) {
+          navigate(location.pathname, {
+            state: {
+              organization: result.organization,
+              user: result.user, // Store user info for auto-login
+              ownerEmail: orgData.ownerEmail,
+              mode: 'organization_created',
+              accessCodes: result.accessCodes
+            },
+            replace: true
+          });
+        }
+        
         toast({
           title: "Organization Created Successfully!",
-          description: "Please check your email for verification code"
+          description: "Please check your email for verification code and access codes"
         });
       }
     } catch (error) {
@@ -303,41 +319,91 @@ const Login = () => {
     try {
       let emailToVerify;
       
-      console.log('Location state:', location.state);
-      console.log('Auth mode:', authMode);
-      
       if (authMode === 'organization_created') {
         // For organization creation, verify the owner's email
         emailToVerify = location.state?.ownerEmail;
-        console.log('Email to verify (org created):', emailToVerify);
       } else {
         // For regular login/registration
         emailToVerify = registerData.email || orgData.ownerEmail;
-        console.log('Email to verify (regular):', emailToVerify);
       }
       
       // Update user as verified (this also verifies the OTP)
       const user = await verifyUserEmail(emailToVerify, otpData.otp);
 
-      toast({
-        title: "Email Verified",
-        description: "Your account has been successfully verified!"
-      });
-
       if (authMode === 'organization_created') {
-        // Navigate to admin dashboard for organization owners
-        navigate('/admin', { 
-          state: { 
-            organization: location.state.organization,
-            userRole: 'org_owner'
+        // Show access codes to admin after verification
+        const accessCodes = location.state?.accessCodes;
+        if (accessCodes) {
+          const invitationText = accessCodes.invitationLink ? 
+            `\n🔗 Invitation Link:\n${accessCodes.invitationLink}` : '';
+          
+          alert(`🎉 Email Verified Successfully!
+
+📋 Your Organization Access Codes:
+• Voter Code: ${accessCodes.voterCode}
+• Admin Code: ${accessCodes.adminCode}${invitationText}
+
+💡 Share these codes with your members to allow them to join your organization.`);
+        }
+        
+        // Automatically create session for the admin
+        try {
+          const user = location.state?.user;
+          const organization = location.state?.organization;
+          
+          if (user && organization) {
+            // Create session directly using the createSession function
+            console.log('Creating session for user:', user.id, 'organization:', organization.id);
+            const sessionToken = await createSession(user.id, organization.id);
+            console.log('Session created successfully:', sessionToken);
+            
+            // Store session
+            localStorage.setItem('session_token', sessionToken);
+            localStorage.setItem('user_id', user.id);
+            localStorage.setItem('user_email', user.email);
+            localStorage.setItem('user_role', 'org_owner');
+            localStorage.setItem('organization_id', organization.id);
+            localStorage.setItem('isAuthenticated', 'true');
+            
+            // Navigate to admin dashboard
+            navigate('/admin', { 
+              state: { 
+                organization: organization,
+                userRole: 'org_owner'
+              }
+            });
+            
+            toast({
+              title: "Welcome to Admin Dashboard!",
+              description: "You have been automatically logged in"
+            });
+          } else {
+            throw new Error('Missing user or organization data');
           }
-        });
+        } catch (sessionError) {
+          console.error('Auto-login failed:', sessionError);
+          // If auto-login fails, redirect to login with organization selected
+          setOrganization(location.state?.organization);
+          setUserRole('org_owner');
+          setActiveTab('login');
+          setShowOTP(false);
+          setOtpData({ otp: '' });
+          toast({
+            title: "Email Verified",
+            description: "Please log in with your password to access admin dashboard"
+          });
+        }
       } else {
         // Switch to login tab for regular users
         setActiveTab('login');
         setLoginData({ email: emailToVerify, password: '' });
         setShowOTP(false);
         setOtpData({ otp: '' });
+        
+        toast({
+          title: "Email Verified",
+          description: "Your account has been successfully verified!"
+        });
       }
 
     } catch (error) {
@@ -465,6 +531,8 @@ const Login = () => {
                     required
                   />
                 </div>
+                
+
               </div>
               
               <Button type="submit" className="w-full" disabled={isLoading}>
@@ -487,29 +555,7 @@ const Login = () => {
                   </Button>
                 )}
                 
-                {/* Debug button for development */}
-                {process.env.NODE_ENV === 'development' && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={async () => {
-                      try {
-                        const { data, error } = await supabase
-                          .from('otps')
-                          .select('*')
-                          .eq('email', location.state?.ownerEmail || '')
-                          .order('created_at', { ascending: false })
-                          .limit(5);
-                        console.log('Debug - OTPs in database:', { data, error });
-                      } catch (err) {
-                        console.error('Debug error:', err);
-                      }
-                    }}
-                    className="text-xs mt-2"
-                  >
-                    Debug: Check OTPs
-                  </Button>
-                )}
+
               </div>
               
               <Button 

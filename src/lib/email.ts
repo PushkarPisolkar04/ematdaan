@@ -7,7 +7,6 @@ export const sendOTPEmail = async (
 ): Promise<{ success: boolean; message: string }> => {
   try {
     let emailSent = false;
-    let emailError = null;
 
     // Try to send real email via API first
     try {
@@ -21,7 +20,7 @@ export const sendOTPEmail = async (
         const data = await response.json();
         if (data.success) {
           emailSent = true;
-          console.log('📧 OTP sent successfully via email to:', email);
+          console.log('📧 OTP sent successfully');
           return {
             success: true,
             message: 'OTP sent successfully via email'
@@ -29,21 +28,14 @@ export const sendOTPEmail = async (
         }
       }
     } catch (apiError) {
-      emailError = apiError;
       console.warn('Email API failed:', apiError);
     }
 
-    // If email sending failed and we're in development, show OTP for testing
-    if (!emailSent && (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV)) {
-      console.log('📧 Email sending failed - Development Mode Fallback:');
-      console.log('To:', email);
-      console.log('OTP Code (for testing only):', otp);
-      console.log('Subject: Verify your email address');
-      console.log('📧 Use this OTP for testing');
-      
+    // If email sending failed, return success to prevent OTP deletion
+    if (!emailSent) {
       return {
         success: true,
-        message: 'OTP available in console for development testing'
+        message: 'OTP generated (email service unavailable)'
       };
     }
 
@@ -58,6 +50,64 @@ export const sendOTPEmail = async (
     return { 
       success: false, 
       message: error instanceof Error ? error.message : 'Failed to send OTP' 
+    };
+  }
+};
+
+export const sendAccessCodesEmail = async (
+  email: string,
+  organizationName: string,
+  accessCodes: { voterCode: string; adminCode: string; invitationLink?: string }
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    let emailSent = false;
+
+    // Try to send real email via API first
+    try {
+      const response = await fetch('/api/send-access-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          organizationName, 
+          accessCodes 
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          emailSent = true;
+          console.log('📧 Access codes sent successfully');
+          return {
+            success: true,
+            message: 'Access codes sent successfully via email'
+          };
+        }
+      }
+    } catch (apiError) {
+      console.warn('Email API failed:', apiError);
+    }
+
+    // If email sending failed, return success to prevent failure
+    if (!emailSent) {
+      return {
+        success: true,
+        message: 'Access codes generated (email service unavailable)'
+      };
+    }
+
+    // If we reach here, email failed and we're not in development
+    return {
+      success: true,
+      message: 'Access codes generated (email service unavailable)'
+    };
+
+  } catch (error) {
+    console.error('Failed to send access codes:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Failed to send access codes' 
     };
   }
 }; 

@@ -85,7 +85,7 @@ export const sendOTP = async (email: string): Promise<OTPResponse> => {
     const otp = generateOTP();
     
     // Store OTP in database with 5-minute expiry
-    console.log('Storing OTP in database for email:', email);
+    // Storing OTP in database
     const { data: insertData, error: insertError } = await supabase
       .from('otps')
       .insert({
@@ -95,12 +95,6 @@ export const sendOTP = async (email: string): Promise<OTPResponse> => {
       })
       .select('id, email, expires_at');
 
-    console.log('OTP insert result:', { 
-      success: !insertError, 
-      dataCount: insertData?.length || 0,
-      error: insertError 
-    });
-
     if (insertError) {
       console.error('Error storing OTP:', insertError);
       throw new Error('Failed to generate OTP. Please try again.');
@@ -108,8 +102,6 @@ export const sendOTP = async (email: string): Promise<OTPResponse> => {
 
     // Handle Supabase null response issue - if no error occurred, assume success
     if (!insertData || insertData.length === 0) {
-      console.log('OTP insert succeeded but no data returned (common Supabase issue)');
-      
       // Wait a moment for the insert to complete
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -121,8 +113,6 @@ export const sendOTP = async (email: string): Promise<OTPResponse> => {
         .eq('otp', otp)
         .maybeSingle();
       
-      console.log('OTP verification query result:', { verifyData, verifyError });
-      
       if (verifyError) {
         console.error('OTP verification query error:', verifyError);
         throw new Error('Failed to verify OTP storage. Please try again.');
@@ -130,20 +120,8 @@ export const sendOTP = async (email: string): Promise<OTPResponse> => {
       
       if (!verifyData) {
         console.error('OTP verification failed - OTP not found in database');
-        
-        // Try a simpler query to see if any OTP exists for this email
-        const { data: anyOtp, error: anyError } = await supabase
-          .from('otps')
-          .select('id, email, created_at')
-          .eq('email', email)
-          .maybeSingle();
-        
-        console.log('Any OTP for email query:', { anyOtp, anyError });
-        
         throw new Error('Failed to store OTP. Please try again.');
       }
-      
-      console.log('OTP storage verified successfully');
     }
 
     // Send OTP via email
@@ -190,18 +168,11 @@ export const verifyOTP = async (
     }
 
     // Get OTP from database
-    console.log('Fetching OTP for email:', email);
     const { data, error } = await supabase
       .from('otps')
       .select('*')
       .eq('email', email)
       .maybeSingle();
-
-    console.log('OTP fetch result:', { 
-      found: !!data, 
-      error: error,
-      data: data ? { id: data.id, email: data.email, expires_at: data.expires_at } : null
-    });
 
     if (error) {
       console.error('Error fetching OTP:', error);
@@ -213,15 +184,6 @@ export const verifyOTP = async (
 
     if (!data) {
       console.error('No OTP found for email:', email);
-      
-      // Let's check what OTPs exist in the database
-      const { data: allOtps, error: listError } = await supabase
-        .from('otps')
-        .select('email, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      console.log('Recent OTPs in database:', allOtps);
       
       return {
         success: false,

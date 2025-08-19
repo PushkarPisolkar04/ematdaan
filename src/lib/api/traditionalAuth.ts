@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { sendOTP, verifyOTP } from '@/lib/otp';
+import { sendAccessCodesEmail } from '@/lib/email';
 
 export interface AuthUser {
   id: string;
@@ -48,7 +49,7 @@ export const createOrganization = async (data: {
   ownerPassword: string;
 }) => {
   try {
-    console.log('Starting organization creation for:', data.name);
+    // Organization creation started
     
     // Generate slug from organization name
     const slug = data.name
@@ -57,19 +58,12 @@ export const createOrganization = async (data: {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
     
-    console.log('Generated slug:', slug);
-
-    // Check if organization already exists (multiple checks for robustness)
-    console.log('Checking if organization exists...');
-    
-    // Check by slug
+    // Check if organization already exists
     const { data: existingOrgBySlug, error: orgCheckError } = await supabase
       .from('organizations')
       .select('id, name, slug')
       .eq('slug', slug)
       .maybeSingle();
-
-    console.log('Organization existence check by slug:', { existingOrgBySlug, orgCheckError });
 
     // Also check by name (case insensitive)
     const { data: existingOrgByName, error: nameCheckError } = await supabase
@@ -77,8 +71,6 @@ export const createOrganization = async (data: {
       .select('id, name, slug')
       .ilike('name', data.name)
       .maybeSingle();
-
-    console.log('Organization existence check by name:', { existingOrgByName, nameCheckError });
 
     if (orgCheckError) {
       console.error('Error checking organization existence by slug:', orgCheckError);
@@ -122,7 +114,6 @@ export const createOrganization = async (data: {
     }
 
     // Generate simple access codes with retry mechanism
-    console.log('Generating access codes...');
     const generateSimpleCode = (prefix: string) => {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let result = prefix.toUpperCase() + '-';
@@ -140,30 +131,16 @@ export const createOrganization = async (data: {
 
     while (attempts < maxAttempts && !org) {
       attempts++;
-      console.log(`Organization creation attempt ${attempts}/${maxAttempts}`);
       
       // Small delay to avoid race conditions (only on retries)
       if (attempts > 1) {
-        console.log('Waiting before retry attempt...');
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       const voterCode = generateSimpleCode(slug) + '-VOTER';
       const adminCode = generateSimpleCode(slug) + '-ADMIN';
-      console.log('Generated codes:', { voterCode, adminCode });
 
       // Create organization
-      console.log('Creating organization...');
-      console.log('Organization data to insert:', {
-        name: data.name,
-        slug,
-        domain: `${slug}.ematdaan.com`,
-        description: `Voting platform for ${data.name}`,
-        code_access_enabled: true,
-        voter_access_code: voterCode,
-        admin_access_code: adminCode,
-        is_active: true
-      });
       
       const result = await supabase
         .from('organizations')
@@ -183,12 +160,8 @@ export const createOrganization = async (data: {
       org = result.data;
       orgError = result.error;
 
-      console.log('Organization insert response:', { data: org, error: orgError });
-
       // Handle case where insert succeeds but data is null (common Supabase issue)
       if (!org && !orgError) {
-        console.log('Insert succeeded but data is null. Checking if organization was created...');
-        
         // Check if the organization was actually created
         const { data: checkOrg, error: checkError } = await supabase
           .from('organizations')
@@ -196,14 +169,10 @@ export const createOrganization = async (data: {
           .eq('slug', slug)
           .maybeSingle();
         
-        console.log('Organization check after null response:', { checkOrg, checkError });
-        
         if (checkOrg) {
-          console.log('Organization was created successfully despite null response:', checkOrg);
           org = checkOrg; // Use the found organization
           break; // Exit the retry loop
         } else {
-          console.log('Organization was not created despite successful insert response');
           // Continue to retry
           continue;
         }
@@ -261,21 +230,10 @@ export const createOrganization = async (data: {
       throw new Error('Failed to create organization. Please try again.');
     }
     
-    console.log('Organization created successfully:', org.id);
-
     // Hash password
-    console.log('Hashing password...');
     const passwordHash = await hashPassword(data.ownerPassword);
 
     // Create owner user
-    console.log('Creating user account...');
-    console.log('User data to insert:', {
-      email: data.ownerEmail,
-      name: data.ownerName,
-      role: 'org_owner',
-      is_verified: false,
-      verification_token: '***' // Don't log the actual token
-    });
     
     let { data: user, error: userError } = await supabase
       .from('auth_users')
@@ -290,12 +248,8 @@ export const createOrganization = async (data: {
       .select()
       .single();
 
-    console.log('User creation response:', { data: user, error: userError });
-
     // Handle case where user insert succeeds but data is null (same Supabase issue)
     if (!user && !userError) {
-      console.log('User insert succeeded but data is null. Checking if user was created...');
-      
       // Check if the user was actually created
       const { data: checkUser, error: checkError } = await supabase
         .from('auth_users')
@@ -303,10 +257,7 @@ export const createOrganization = async (data: {
         .eq('email', data.ownerEmail)
         .maybeSingle();
       
-      console.log('User check after null response:', { checkUser, checkError });
-      
       if (checkUser) {
-        console.log('User was created successfully despite null response:', checkUser);
         user = checkUser; // Use the found user
       } else {
         console.error('User was not created despite successful insert response');
@@ -315,13 +266,7 @@ export const createOrganization = async (data: {
     }
 
     if (userError) {
-      console.error('Error creating user:', userError);
-      console.error('User error details:', {
-        code: userError.code,
-        message: userError.message,
-        details: userError.details,
-        hint: userError.hint
-      });
+      console.error('Error creating user account');
       throw new Error('Failed to create user account. Please try again.');
     }
 
@@ -330,16 +275,7 @@ export const createOrganization = async (data: {
       throw new Error('Failed to create user account. Please try again.');
     }
     
-    console.log('User created successfully:', user.id);
-
     // Link user to organization
-    console.log('Linking user to organization...');
-    console.log('User-organization link data:', {
-      user_id: user.id,
-      organization_id: org.id,
-      role: 'org_owner',
-      joined_via: 'organization_creation'
-    });
     
     const { data: linkData, error: linkError } = await supabase
       .from('user_organizations')
@@ -352,42 +288,63 @@ export const createOrganization = async (data: {
       .select()
       .single();
 
-    console.log('User-organization link response:', { data: linkData, error: linkError });
-
     if (linkError) {
       console.error('Error linking user to organization:', linkError);
-      console.error('Link error details:', {
-        code: linkError.code,
-        message: linkError.message,
-        details: linkError.details,
-        hint: linkError.hint
-      });
       throw new Error('Failed to link user to organization. Please try again.');
     }
-    
-    console.log('User linked to organization successfully');
 
     // Send verification email
-    console.log('Sending verification email...');
     let otpSent = false;
     try {
       await sendOTP(data.ownerEmail);
       otpSent = true;
-      console.log('Verification email sent successfully');
     } catch (otpError) {
       console.error('Error sending OTP:', otpError);
       // Don't throw error - allow organization creation to succeed even if OTP fails
-      console.warn('OTP sending failed, but organization was created successfully');
     }
 
-    console.log('Organization creation completed successfully');
+    // Create invitation link for admin
+    let invitationLink = '';
+    try {
+      const invitationToken = await createInvitationToken({
+        organizationId: org.id,
+        role: 'admin',
+        expiresInDays: 30,
+        usageLimit: 10,
+        createdBy: user.id
+      });
+      
+      invitationLink = `${import.meta.env.VITE_APP_URL || 'http://localhost:3000'}/login?token=${invitationToken.token}`;
+    } catch (invitationError) {
+      console.error('Error creating invitation link:', invitationError);
+      // Don't throw error - allow organization creation to succeed even if invitation fails
+    }
+
+    // Send access codes email to admin
+    try {
+      await sendAccessCodesEmail(
+        data.ownerEmail,
+        data.name,
+        {
+          voterCode: org.voter_access_code,
+          adminCode: org.admin_access_code,
+          invitationLink: invitationLink
+        }
+      );
+    } catch (accessCodesError) {
+      console.error('Error sending access codes email:', accessCodesError);
+      // Don't throw error - allow organization creation to succeed even if email fails
+    }
+
+    // Organization creation completed successfully
     return { 
       user, 
       organization: org, 
       otpSent,
       accessCodes: {
         voterCode: org.voter_access_code,
-        adminCode: org.admin_access_code
+        adminCode: org.admin_access_code,
+        invitationLink: invitationLink
       }
     };
   } catch (error) {
@@ -707,7 +664,7 @@ export const validateSession = async (sessionToken: string) => {
 };
 
 // Create session
-const createSession = async (userId: string, organizationId: string): Promise<string> => {
+export const createSession = async (userId: string, organizationId: string): Promise<string> => {
   try {
     const { data, error } = await supabase.rpc('create_user_session', {
       p_user_id: userId,
