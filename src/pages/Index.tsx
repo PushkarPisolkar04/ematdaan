@@ -71,6 +71,28 @@ const Index = () => {
       // Clean up the URL
       navigate('/', { replace: true });
     }
+
+    // Check if we should scroll to a specific section
+    const scrollTo = searchParams.get('scrollTo');
+    if (scrollTo === 'faqs') {
+      // Use a longer timeout to ensure the page and components are fully loaded
+      setTimeout(() => {
+        const faqsElement = document.getElementById('faqs');
+        if (faqsElement) {
+          // Add a small offset to account for the fixed navbar
+          const navbarHeight = 80; // Height of the navbar
+          const elementPosition = faqsElement.offsetTop - navbarHeight;
+          window.scrollTo({
+            top: elementPosition,
+            behavior: 'smooth'
+          });
+        }
+        // Clean up the URL after scrolling
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 500);
+      }, 200);
+    }
   }, [searchParams, navigate]);
 
   useEffect(() => {

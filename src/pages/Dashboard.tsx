@@ -23,7 +23,6 @@ import { supabase } from '@/lib/supabase';
 interface Election {
   id: string;
   name: string;
-  description: string;
   start_time: string;
   end_time: string;
   is_active: boolean;
@@ -113,7 +112,6 @@ const Dashboard = () => {
         .select(`
           id,
           name,
-          description,
           start_time,
           end_time,
           is_active,
@@ -417,7 +415,7 @@ const Dashboard = () => {
                         </Badge>
                       </div>
                       <CardDescription>
-                        {election.description || 'No description available'}
+                        {election.name}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">

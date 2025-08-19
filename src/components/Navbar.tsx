@@ -94,15 +94,52 @@ export default function Navbar() {
   const handleFAQClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     if (location.pathname === '/') {
-      document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' });
+      // If already on home page, scroll directly
+      const faqsElement = document.getElementById('faqs');
+      if (faqsElement) {
+        // Add offset for fixed navbar
+        const navbarHeight = 80;
+        const elementPosition = faqsElement.offsetTop - navbarHeight;
+        window.scrollTo({
+          top: elementPosition,
+          behavior: 'smooth'
+        });
+      }
     } else {
+      // If on another page, navigate to home with scroll parameter
       navigate('/?scrollTo=faqs');
     }
     setIsMenuOpen(false);
   };
 
+  const handleHomeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (location.pathname === '/') {
+      // If already on home page, scroll to top
+      e.preventDefault();
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+    // If on another page, let the Link component handle navigation
+    setIsMenuOpen(false);
+  };
+
+  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (location.pathname === '/') {
+      // If already on home page, scroll to top
+      e.preventDefault();
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+    // If on another page, let the Link component handle navigation
+    setIsMenuOpen(false);
+  };
+
   const navItems = [
-    { label: "Home", href: "/" },
+    { label: "Home", href: "/", onClick: handleHomeClick },
     { label: "Vote", href: "/auth" },
     { label: "Results", href: "/results" },
     { label: "Verify Vote", href: "/verify-vote" },
@@ -115,7 +152,7 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-3 group">
+            <Link to="/" onClick={handleLogoClick} className="flex items-center space-x-3 group">
               <img src="/logo.png" alt="E-Matdaan" className="h-12 w-auto transition-transform group-hover:scale-105" />
               <span className="text-2xl font-bold text-gray-900 tracking-tight">E-Matdaan</span>
             </Link>
@@ -198,8 +235,10 @@ export default function Navbar() {
                   <div className="flex flex-col h-full">
                     {/* Mobile Logo */}
                     <div className="flex items-center space-x-3 mb-8">
-                      <img src="/logo.png" alt="E-Matdaan" className="h-10 w-auto" />
-                      <span className="text-xl font-bold text-gray-900">E-Matdaan</span>
+                      <Link to="/" onClick={handleLogoClick} className="flex items-center space-x-3">
+                        <img src="/logo.png" alt="E-Matdaan" className="h-10 w-auto" />
+                        <span className="text-xl font-bold text-gray-900">E-Matdaan</span>
+                      </Link>
                     </div>
 
                     {/* Mobile Navigation */}

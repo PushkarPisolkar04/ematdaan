@@ -25,13 +25,20 @@ import {
   Download,
   HelpCircle,
   Info,
-  Target
+  Target,
+  RefreshCw
 } from 'lucide-react';
 import { 
   createInvitationToken,
   getUserOrganizations,
   validateSession
 } from '@/lib/api/traditionalAuth';
+import { 
+  triggerManualCleanup, 
+  getCleanupStats, 
+  getCleanupLogs,
+  cleanupService
+} from '@/lib/cleanup';
 import { supabase } from '@/lib/supabase';
 
 interface Election {
@@ -77,6 +84,9 @@ const Admin = () => {
     totalVotes: 0,
     pendingInvitations: 0
   });
+  const [cleanupStats, setCleanupStats] = useState<any[]>([]);
+  const [cleanupLogs, setCleanupLogs] = useState<any[]>([]);
+  const [isCleanupRunning, setIsCleanupRunning] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -97,6 +107,18 @@ const Admin = () => {
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
+
+  // Refresh stats when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && organization?.id) {
+        loadStats(organization.id);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [organization?.id]);
 
   const checkAuthAndLoadData = async () => {
       try {
@@ -157,7 +179,8 @@ const Admin = () => {
         loadElections(organizationId),
         loadUsers(organizationId),
         loadAccessTokens(organizationId),
-        loadStats(organizationId)
+        loadStats(organizationId),
+        loadCleanupData()
       ]);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -249,41 +272,112 @@ const Admin = () => {
     }
   };
 
+  const loadCleanupData = async () => {
+    try {
+      const [statsResult, logsResult] = await Promise.all([
+        getCleanupStats(),
+        getCleanupLogs(20)
+      ]);
+      
+      if (statsResult.success) {
+        setCleanupStats(statsResult.stats);
+      }
+      
+      if (logsResult.success) {
+        setCleanupLogs(logsResult.logs);
+      }
+    } catch (error) {
+      console.error('Failed to load cleanup data:', error);
+    }
+  };
+
+  const handleManualCleanup = async () => {
+    setIsCleanupRunning(true);
+    try {
+      const result = await triggerManualCleanup();
+      
+      if (result.success) {
+        toast({
+          title: "Cleanup Completed",
+          description: `Cleaned ${result.total_cleaned} expired records (Sessions: ${result.sessions_cleaned}, Tokens: ${result.tokens_cleaned}, OTPs: ${result.otps_cleaned}, Password Resets: ${result.password_resets_cleaned})`,
+        });
+        
+        // Refresh cleanup data
+        await loadCleanupData();
+      } else {
+        toast({
+          title: "Cleanup Failed",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Cleanup Error",
+        description: "Failed to run cleanup operations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCleanupRunning(false);
+    }
+  };
+
   const loadStats = async (organizationId: string) => {
     try {
-      // Get total users
-      const { count: totalUsers } = await supabase
+      // Get total users (including organization owner)
+      const { count: totalUsers, error: usersError } = await supabase
         .from('user_organizations')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 
+      if (usersError) {
+        console.error('Error loading users count:', usersError);
+      }
+
+      // Get total elections (not just active ones)
+      const { count: totalElections, error: electionsError } = await supabase
+        .from('elections')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+
+      if (electionsError) {
+        console.error('Error loading elections count:', electionsError);
+      }
+
       // Get active elections
-      const { count: activeElections } = await supabase
+      const { count: activeElections, error: activeElectionsError } = await supabase
         .from('elections')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 
+      if (activeElectionsError) {
+        console.error('Error loading active elections count:', activeElectionsError);
+      }
+
       // Get total votes
-      const { count: totalVotes } = await supabase
+      const { count: totalVotes, error: votesError } = await supabase
         .from('votes')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId);
 
-      // Get pending invitations (tokens not used)
-      const { count: pendingInvitations } = await supabase
-        .from('access_tokens')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .lt('used_count', 'usage_limit');
+      if (votesError) {
+        console.error('Error loading votes count:', votesError);
+      }
+
+      console.log('Stats loaded:', {
+        totalUsers,
+        totalElections,
+        activeElections,
+        totalVotes
+      });
 
       setStats({
         totalUsers: totalUsers || 0,
         activeElections: activeElections || 0,
         totalVotes: totalVotes || 0,
-        pendingInvitations: pendingInvitations || 0
+        pendingInvitations: 0 // Simplified for now
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -502,15 +596,30 @@ const Admin = () => {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="elections">Elections</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="invitations">Invitations</TabsTrigger>
+            <TabsTrigger value="system">System</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Header with Refresh Button */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">Organization Overview</h2>
+              <Button 
+                onClick={() => organization?.id && loadStats(organization.id)}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Stats
+              </Button>
+            </div>
+            
         {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
@@ -899,6 +1008,143 @@ const Admin = () => {
               </div>
             </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* System Tab */}
+          <TabsContent value="system" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Cleanup</CardTitle>
+                <CardDescription>
+                  Manage expired sessions, tokens, and other system data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <h4 className="font-medium">Automatic Cleanup</h4>
+                    <p className="text-sm text-gray-600">
+                      System automatically cleans expired data periodically
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Status: {cleanupService.getStatus().autoCleanupEnabled ? 'Enabled' : 'Disabled'} 
+                      {cleanupService.getStatus().isRunning && ' (Running...)'}
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleManualCleanup}
+                    disabled={isCleanupRunning}
+                    variant="outline"
+                  >
+                    {isCleanupRunning ? 'Running...' : 'Run Manual Cleanup'}
+                  </Button>
+                </div>
+
+                {/* Cleanup Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {cleanupStats.map((stat) => (
+                    <Card key={stat.operation_type}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium capitalize">
+                          {stat.operation_type}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{stat.total_records_cleaned}</div>
+                        <p className="text-xs text-muted-foreground">
+                          Records cleaned ({stat.total_runs} runs)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Last: {stat.last_run ? new Date(stat.last_run).toLocaleDateString() : 'Never'}
+                        </p>
+                        {stat.failed_runs > 0 && (
+                          <p className="text-xs text-red-600">
+                            {stat.failed_runs} failed runs
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Cleanup Logs</CardTitle>
+                <CardDescription>
+                  View recent cleanup operations and their results
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {cleanupLogs.length > 0 ? (
+                    cleanupLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={log.status === 'success' ? 'default' : 'destructive'}>
+                              {log.operation_type}
+                            </Badge>
+                            <span className="text-sm text-gray-600">
+                              {log.records_affected} records affected
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(log.created_at).toLocaleString()}
+                            {log.execution_time && ` • ${log.execution_time}`}
+                          </p>
+                          {log.error_message && (
+                            <p className="text-xs text-red-600 mt-1">
+                              Error: {log.error_message}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={log.status === 'success' ? 'outline' : 'destructive'}>
+                          {log.status}
+                        </Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No cleanup logs available</p>
+                      <p className="text-sm">Run a manual cleanup to see logs</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>System Information</CardTitle>
+                <CardDescription>
+                  Current system status and configuration
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium text-sm">Cleanup Settings</h4>
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      <p>• Sessions expire after: 24 hours</p>
+                      <p>• Tokens cleaned after: 7 days post-expiry</p>
+                      <p>• OTPs expire immediately after use</p>
+                      <p>• Password resets expire after: 1 hour</p>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium text-sm">Auto-Cleanup Status</h4>
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      <p>• Trigger-based cleanup: Enabled</p>
+                      <p>• Manual cleanup: Available</p>
+                      <p>• Background service: {cleanupService.getStatus().autoCleanupEnabled ? 'Running' : 'Stopped'}</p>
+                      <p>• Last cleanup: Check logs above</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

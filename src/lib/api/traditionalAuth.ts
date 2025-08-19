@@ -113,14 +113,18 @@ export const createOrganization = async (data: {
       throw new Error('User already exists with this email');
     }
 
-    // Generate simple access codes with retry mechanism
-    const generateSimpleCode = (prefix: string) => {
+    // Generate secure access codes
+    const generateSecureCode = (prefix: string, role: string) => {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let result = prefix.toUpperCase() + '-';
-      for (let i = 0; i < 8; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      const timestamp = Date.now().toString(36).toUpperCase();
+      let randomPart = '';
+      
+      // Generate 12 character random part for better security
+      for (let i = 0; i < 12; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-      return result;
+      
+      return `${prefix.toUpperCase()}-${timestamp}-${randomPart}-${role.toUpperCase()}`;
     };
 
     // Retry mechanism for organization creation
@@ -137,8 +141,8 @@ export const createOrganization = async (data: {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      const voterCode = generateSimpleCode(slug) + '-VOTER';
-      const adminCode = generateSimpleCode(slug) + '-ADMIN';
+      const voterCode = generateSecureCode(slug, 'VOTER');
+      const adminCode = generateSecureCode(slug, 'ADMIN');
 
       // Create organization
       
@@ -235,7 +239,10 @@ export const createOrganization = async (data: {
 
     // Create owner user
     
-    let { data: user, error: userError } = await supabase
+    let user = null;
+    let userError = null;
+    
+    const userResult = await supabase
       .from('auth_users')
       .insert({
         email: data.ownerEmail,
@@ -247,6 +254,9 @@ export const createOrganization = async (data: {
       })
       .select()
       .single();
+
+    user = userResult.data;
+    userError = userResult.error;
 
     // Handle case where user insert succeeds but data is null (same Supabase issue)
     if (!user && !userError) {
@@ -283,7 +293,8 @@ export const createOrganization = async (data: {
         user_id: user.id,
         organization_id: org.id,
         role: 'org_owner',
-        joined_via: 'organization_creation'
+        joined_via: 'organization_creation',
+        is_active: true
       })
       .select()
       .single();
@@ -314,7 +325,11 @@ export const createOrganization = async (data: {
         createdBy: user.id
       });
       
-      invitationLink = `${import.meta.env.VITE_APP_URL || 'http://localhost:3000'}/login?token=${invitationToken.token}`;
+      if (invitationToken && invitationToken.token) {
+        const baseUrl = import.meta.env.VITE_APP_URL || 
+                       (import.meta.env.PROD ? window.location.origin : 'http://localhost:3000');
+        invitationLink = `${baseUrl}/login?token=${invitationToken.token}`;
+      }
     } catch (invitationError) {
       console.error('Error creating invitation link:', invitationError);
       // Don't throw error - allow organization creation to succeed even if invitation fails

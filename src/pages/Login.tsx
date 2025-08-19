@@ -13,7 +13,8 @@ import {
   loginUser,
   verifyUserEmail,
   getUserOrganizations,
-  createSession
+  createSession,
+  createInvitationToken
 } from '@/lib/api/traditionalAuth';
 import { verifyOTP, sendOTP } from '@/lib/otp';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +24,7 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('login');
-  const [authMode, setAuthMode] = useState<'access_code' | 'invitation' | 'organization' | 'organization_created'>('access_code');
+  const [authMode, setAuthMode] = useState<'access_code' | 'invitation' | 'organization' | 'organization_created' | 'direct_login'>('direct_login');
   const [isLoading, setIsLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -172,6 +173,11 @@ const Login = () => {
         ownerEmail: orgData.ownerEmail,
         ownerPassword: orgData.password
       });
+      
+      console.log('Organization creation result:', result);
+      console.log('User from result:', result.user);
+      console.log('Organization from result:', result.organization);
+      console.log('Access codes from result:', result.accessCodes);
 
       if (result.otpSent) {
         setShowOTP(true);
@@ -179,6 +185,12 @@ const Login = () => {
         
         // Store access codes and user info in location state for later display
         if (result.accessCodes) {
+          console.log('Storing state for auto-login:', {
+            organization: result.organization,
+            user: result.user,
+            accessCodes: result.accessCodes
+          });
+          
           navigate(location.pathname, {
             state: {
               organization: result.organization,
@@ -261,6 +273,70 @@ const Login = () => {
     }
   };
 
+  const handleDirectLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    setIsLoading(true);
+    try {
+      // First, get user's organizations
+      const { data: user, error: userError } = await supabase
+        .from('auth_users')
+        .select('*')
+        .eq('email', loginData.email)
+        .single();
+
+      if (userError || !user) {
+        throw new Error('User not found. Please check your email or register first.');
+      }
+
+      // Get user's organizations
+      const userOrgs = await getUserOrganizations(user.id);
+      
+      if (!userOrgs || userOrgs.length === 0) {
+        throw new Error('No organizations found. Please join an organization first.');
+      }
+
+      // If user has multiple organizations, use the first active one
+      const activeOrg = userOrgs.find(org => org.is_active) || userOrgs[0];
+      
+      // Now login with the organization
+      const result = await loginUser({
+        email: loginData.email,
+        password: loginData.password,
+        organizationId: activeOrg.organization_id
+      });
+
+      // Store session
+      localStorage.setItem('session_token', result.sessionToken);
+      localStorage.setItem('user_id', result.user.id);
+      localStorage.setItem('user_email', result.user.email);
+      localStorage.setItem('user_role', result.userOrganization.role);
+      localStorage.setItem('organization_id', activeOrg.organization_id);
+      localStorage.setItem('isAuthenticated', 'true');
+
+      toast({
+        title: "Login Successful",
+        description: `Welcome back, ${result.user.name}!`
+      });
+
+      // Redirect based on role
+      if (result.userOrganization.role === 'org_owner' || result.userOrganization.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Direct login error:', error);
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : 'Invalid credentials',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -333,34 +409,100 @@ const Login = () => {
       if (authMode === 'organization_created') {
         // Show access codes to admin after verification
         const accessCodes = location.state?.accessCodes;
-        if (accessCodes) {
-          const invitationText = accessCodes.invitationLink ? 
-            `\n🔗 Invitation Link:\n${accessCodes.invitationLink}` : '';
+        const organization = location.state?.organization;
+        
+        if (accessCodes || organization) {
+          const voterCode = accessCodes?.voterCode || organization?.voter_access_code;
+          const adminCode = accessCodes?.adminCode || organization?.admin_access_code;
           
-          alert(`🎉 Email Verified Successfully!
-
-📋 Your Organization Access Codes:
-• Voter Code: ${accessCodes.voterCode}
-• Admin Code: ${accessCodes.adminCode}${invitationText}
-
-💡 Share these codes with your members to allow them to join your organization.`);
+          // Create secure invitation link if not available
+          let invitationText = '';
+          if (accessCodes?.invitationLink) {
+            invitationText = `\n🔗 Invitation Link:\n${accessCodes.invitationLink}`;
+          } else if (organization) {
+            // Create a secure invitation token
+            try {
+              const userData = location.state?.user || await supabase
+                .from('auth_users')
+                .select('*')
+                .eq('email', location.state?.ownerEmail)
+                .single()
+                .then(result => result.data);
+              
+              if (userData) {
+                const invitationToken = await createInvitationToken({
+                  organizationId: organization.id,
+                  role: 'admin',
+                  expiresInDays: 7,
+                  usageLimit: 10,
+                  createdBy: userData.id
+                });
+                
+                                 if (invitationToken && invitationToken.token) {
+                   const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+                   invitationText = `\n🔗 Secure Invitation Link:\n${baseUrl}/login?token=${invitationToken.token}`;
+                 }
+              }
+            } catch (error) {
+              console.error('Failed to create invitation token');
+            }
+          }
+          
+          // Show success toast first
+          toast({
+            title: "🎉 Email Verified Successfully!",
+            description: "Your organization is now active. Access codes have been sent to your email.",
+            duration: 5000
+          });
+          
+          // Show access codes in a better format after a short delay
+          setTimeout(() => {
+            toast({
+              title: "📋 Your Organization Access Codes",
+              description: `Voter: ${voterCode} | Admin: ${adminCode}`,
+              duration: 10000
+            });
+          }, 1000);
         }
         
         // Automatically create session for the admin
         try {
+          console.log('Location state in OTP verification:', location.state);
           const user = location.state?.user;
           const organization = location.state?.organization;
+          const ownerEmail = location.state?.ownerEmail;
           
-          if (user && organization) {
+          console.log('User data:', user);
+          console.log('Organization data:', organization);
+          console.log('Owner email:', ownerEmail);
+          
+          if (organization && ownerEmail) {
+            // If user data is missing, fetch it from database
+            let userData = user;
+            if (!userData) {
+              console.log('Fetching user data from database for email:', ownerEmail);
+              const { data: fetchedUser, error: fetchError } = await supabase
+                .from('auth_users')
+                .select('*')
+                .eq('email', ownerEmail)
+                .single();
+              
+              if (fetchError || !fetchedUser) {
+                throw new Error('Could not fetch user data');
+              }
+              userData = fetchedUser;
+              console.log('Fetched user data:', userData);
+            }
+            
             // Create session directly using the createSession function
-            console.log('Creating session for user:', user.id, 'organization:', organization.id);
-            const sessionToken = await createSession(user.id, organization.id);
+            console.log('Creating session for user:', userData.id, 'organization:', organization.id);
+            const sessionToken = await createSession(userData.id, organization.id);
             console.log('Session created successfully:', sessionToken);
             
             // Store session
             localStorage.setItem('session_token', sessionToken);
-            localStorage.setItem('user_id', user.id);
-            localStorage.setItem('user_email', user.email);
+            localStorage.setItem('user_id', userData.id);
+            localStorage.setItem('user_email', userData.email);
             localStorage.setItem('user_role', 'org_owner');
             localStorage.setItem('organization_id', organization.id);
             localStorage.setItem('isAuthenticated', 'true');
@@ -378,7 +520,7 @@ const Login = () => {
               description: "You have been automatically logged in"
             });
           } else {
-            throw new Error('Missing user or organization data');
+            throw new Error('Missing organization or owner email data');
           }
         } catch (sessionError) {
           console.error('Auto-login failed:', sessionError);
@@ -474,18 +616,27 @@ const Login = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-lg mb-2 text-blue-800">For Voters:</h4>
+                  <h4 className="font-semibold text-lg mb-2 text-green-800">Existing Users:</h4>
                   <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">• Get access code from your organization admin</p>
-                    <p className="text-gray-700">• Enter the code above to sign in</p>
-                    <p className="text-gray-700">• Verify your email and start voting</p>
+                    <p className="text-gray-700">• Click "Login" to sign in directly</p>
+                    <p className="text-gray-700">• Use your email and password</p>
+                    <p className="text-gray-700">• Access your dashboard instantly</p>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-semibold text-lg mb-2 text-purple-800">For Admins:</h4>
+                  <h4 className="font-semibold text-lg mb-2 text-blue-800">New Users:</h4>
                   <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">• Click "Create Org" tab to set up organization</p>
+                    <p className="text-gray-700">• Get access code from your organization admin</p>
+                    <p className="text-gray-700">• Click "Join Org" and enter the code</p>
+                    <p className="text-gray-700">• Register and verify your email</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-lg mb-2 text-purple-800">Organization Owners:</h4>
+                  <div className="space-y-2 text-sm">
+                    <p className="text-gray-700">• Click "Create Org" to set up organization</p>
                     <p className="text-gray-700">• Generate access codes for your members</p>
                     <p className="text-gray-700">• Create and manage elections</p>
                   </div>
@@ -574,23 +725,35 @@ const Login = () => {
             <div className="space-y-6">
               {/* Auth Mode Selection */}
               {!organization && (
-                <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('direct_login')}
+                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                      authMode === 'direct_login'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <User className="h-4 w-4" />
+                    Login
+                  </button>
                   <button
                     type="button"
                     onClick={() => setAuthMode('access_code')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
                       authMode === 'access_code'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     <Key className="h-4 w-4" />
-                    Access Code
+                    Join Org
                   </button>
                   <button
                     type="button"
                     onClick={() => setAuthMode('organization')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
                       authMode === 'organization'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
@@ -599,6 +762,62 @@ const Login = () => {
                     <Building className="h-4 w-4" />
                     Create Org
                   </button>
+                </div>
+              )}
+
+              {/* Direct Login Form */}
+              {authMode === 'direct_login' && !organization && (
+                <div className="space-y-4">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Welcome Back!</h3>
+                    <p className="text-sm text-gray-600">Sign in to your account</p>
+                  </div>
+                  
+                  <form onSubmit={handleDirectLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="email"
+                          value={loginData.email}
+                          onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                          placeholder="Enter your email"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="password"
+                          value={loginData.password}
+                          onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                          placeholder="Enter your password"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Signing in...' : 'Sign In'}
+                    </Button>
+                    
+                    <div className="text-center">
+                      <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                        Forgot your password?
+                      </Link>
+                    </div>
+                  </form>
                 </div>
               )}
 
@@ -727,138 +946,90 @@ const Login = () => {
                 </form>
               )}
 
-              {/* Login/Register Tabs */}
+              {/* Registration Form for Organization Join */}
               {organization && (
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Register</TabsTrigger>
-              </TabsList>
+                <div className="space-y-4">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Join {organization.name}</h3>
+                    <p className="text-sm text-gray-600">Create your account to get started</p>
+                  </div>
               
-                  <TabsContent value="login" className="space-y-4 mt-4">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                        placeholder="Enter your email"
-                        className="pl-10"
-                        required
-                      />
-                </div>
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="text"
+                          value={registerData.name}
+                          onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
+                          placeholder="Enter your full name"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="email"
+                          value={registerData.email}
+                          onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                          placeholder="Enter your email"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="password"
+                          value={registerData.password}
+                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                          placeholder="Create a password"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          type="password"
+                          value={registerData.confirmPassword}
+                          onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                          placeholder="Confirm your password"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Creating account...' : 'Create Account'}
+                    </Button>
+                  </form>
+              
+
               </div>
-              
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                        placeholder="Enter your password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-              </div>
-              
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Signing in...' : 'Sign In'}
-                  </Button>
-                  
-                  <div className="text-center">
-                    <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                      Forgot your password?
-                    </Link>
-                  </div>
-                </form>
-              </TabsContent>
-              
-                  <TabsContent value="register" className="space-y-4 mt-4">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="text"
-                        value={registerData.name}
-                        onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                        placeholder="Enter your full name"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="email"
-                        value={registerData.email}
-                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                        placeholder="Enter your email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="password"
-                        value={registerData.password}
-                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                        placeholder="Create a password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="password"
-                        value={registerData.confirmPassword}
-                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                        placeholder="Confirm your password"
-                        className="pl-10"
-                        required
-                      />
-              </div>
-            </div>
-                  
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating account...' : 'Create Account'}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
               )}
 
               {/* Back to main options */}
