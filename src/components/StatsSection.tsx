@@ -1,94 +1,147 @@
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
-import { Users, Vote, Clock, ShieldCheck } from "lucide-react";
-import { Card, CardContent } from "./ui/card";
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Users, Vote, Calendar, CheckCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { fetchPlatformStats, PlatformStats } from "@/lib/api/stats";
 
-interface SiteStatsData {
-  registered_voters: number;
-  total_votes: number;
-  turnout: number;
-  avg_confirmation_time: number;
-  security_score: number;
-}
-
-export default function StatsSection() {
-  const [stats, setStats] = useState<SiteStatsData | null>(null);
+const StatsSection = () => {
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start end", "end start"]
-  });
-
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [0, 1]);
-  const y = useTransform(scrollYProgress, [0, 0.5], [100, 0]);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const loadStats = async () => {
       try {
-        const { data, error } = await supabase
-          .from('site_stats')
-          .select('*')
-          .single();
-        if (error) throw error;
-        setStats(data);
+        const platformStats = await fetchPlatformStats();
+        setStats(platformStats);
       } catch (error) {
-        console.error('Error fetching site stats:', error);
+        console.error('Failed to load stats:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
+    loadStats();
+    
+    // Refresh stats every 30 seconds
+    const interval = setInterval(loadStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <section ref={containerRef} className="py-20 bg-gradient-to-b from-background to-muted/20">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-muted-foreground">Loading statistics...</p>
-        </div>
-      </section>
-    );
-  }
+  const formatNumber = (num: number): string => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    } else if (num >= 1000) {
+      return `${(num / 1000).toFixed(1)}K`;
+    }
+    return num.toString();
+  };
+
+  const statsData = [
+    {
+      icon: Vote,
+      value: loading ? "..." : formatNumber(stats?.totalVotes || 0),
+      label: "Total Votes",
+      description: "Secure votes processed",
+      color: "from-purple-500 to-purple-600",
+      bgColor: "from-purple-50 to-purple-100",
+    },
+    {
+      icon: Users,
+      value: loading ? "..." : formatNumber(stats?.totalUsers || 0),
+      label: "Registered Users",
+      description: "Active platform users",
+      color: "from-blue-500 to-blue-600",
+      bgColor: "from-blue-50 to-blue-100",
+    },
+    {
+      icon: Calendar,
+      value: loading ? "..." : stats?.activeElections || 0,
+      label: "Active Elections",
+      description: "Currently running",
+      color: "from-emerald-600 to-teal-600",
+      bgColor: "from-emerald-50 to-teal-50",
+    },
+    {
+      icon: CheckCircle,
+      value: loading ? "..." : stats?.totalElections || 0,
+      label: "Total Elections",
+      description: "Successfully completed",
+      color: "from-orange-500 to-orange-600",
+      bgColor: "from-orange-50 to-orange-100",
+    },
+  ];
 
   return (
-    <section ref={containerRef} className="py-20 bg-gradient-to-b from-background to-muted/20">
+    <section className="py-16 w-full bg-gradient-to-r from-gray-900/5 via-purple-900/5 to-blue-900/5 backdrop-blur-sm">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
       <motion.div
-        style={{ opacity, y }}
-        className="container mx-auto px-4"
-      >
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Trust in Numbers</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Real-time statistics from our secure e-voting platform. Every vote is encrypted, verified, and immutably recorded.
-          </p>
-        </div>
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">
+              Platform Statistics
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Real-time data from our secure voting platform. All statistics are 
+              updated automatically from live database queries.
+            </p>
+          </motion.div>
 
-        <div className="max-w-2xl mx-auto">
-          <Card className="text-center h-full hover:shadow-lg transition-shadow duration-300 bg-white dark:bg-zinc-900">
-            <CardContent className="p-8 grid grid-cols-1 sm:grid-cols-3 divide-y-0 sm:divide-y-0 sm:divide-x divide-muted-foreground/10 gap-0">
-              <div className="px-4 py-4 flex flex-col items-center justify-center">
-                <Users className="h-8 w-8 text-blue-500 mb-2" />
-                <div className="text-2xl font-bold">{stats?.registered_voters?.toLocaleString() ?? 0}</div>
-                <div className="text-xs text-muted-foreground">Registered Voters</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {statsData.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                >
+                  <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-white/90 backdrop-blur-sm group">
+                    <CardContent className="p-8 text-center">
+                      <div className={`bg-gradient-to-r ${stat.bgColor} w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                        <div className={`bg-gradient-to-r ${stat.color} p-3 rounded-xl`}>
+                          <Icon className="h-7 w-7 text-white" />
+        </div>
               </div>
-              <div className="px-4 py-4 flex flex-col items-center justify-center">
-                <Vote className="h-8 w-8 text-green-500 mb-2" />
-                <div className="text-2xl font-bold">{stats?.total_votes?.toLocaleString() ?? 0}</div>
-                <div className="text-xs text-muted-foreground">Votes Cast</div>
+                      <div className={`text-4xl font-bold mb-2 text-gray-900 ${loading ? 'animate-pulse' : ''}`}>
+                        {stat.value}
               </div>
-              <div className="px-4 py-4 flex flex-col items-center justify-center">
-                <ShieldCheck className="h-8 w-8 text-purple-500 mb-2" />
-                <div className="text-2xl font-bold">{stats?.security_score ?? 0}%</div>
-                <div className="text-xs text-muted-foreground">Security Rating</div>
+                      <div className="text-lg font-semibold mb-1 text-gray-800">
+                        {stat.label}
               </div>
+                      <p className="text-gray-600 text-sm">
+                        {stat.description}
+                      </p>
             </CardContent>
           </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+          
+          {stats && !loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              viewport={{ once: true }}
+              className="text-center mt-8"
+            >
+              <p className="text-gray-500 text-sm">
+                Last updated: {new Date().toLocaleTimeString()}
+              </p>
+            </motion.div>
+          )}
         </div>
-      </motion.div>
+      </div>
     </section>
   );
-} 
+};
+
+export default StatsSection; 

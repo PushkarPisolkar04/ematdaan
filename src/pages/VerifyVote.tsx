@@ -274,7 +274,7 @@ const VerifyVote = () => {
                 <h4 className="font-semibold mb-2">Still having issues?</h4>
                 <ul className="space-y-1 text-muted-foreground">
                   <li>• Contact support team</li>
-                  <li>• Provide your MetaMask address</li>
+                  <li>• Provide your email address</li>
                   <li>• Include timestamp of your vote</li>
                   <li>• Available 24/7 during voting period</li>
                 </ul>

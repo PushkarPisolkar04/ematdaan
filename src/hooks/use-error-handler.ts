@@ -10,7 +10,7 @@ interface ErrorResponse {
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  'auth/unauthorized': 'Please connect your MetaMask wallet to continue.',
+  'auth/unauthorized': 'Please login to continue.',
   'auth/forbidden': 'You do not have permission to perform this action.',
   'validation/invalid': 'Please check your input and try again.',
   'election/not-found': 'The requested election could not be found.',

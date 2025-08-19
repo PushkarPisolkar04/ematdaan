@@ -371,7 +371,7 @@ const Results = () => {
               <div>
                 <h4 className="font-semibold mb-2">Voting Process</h4>
                 <ul className="space-y-1 text-muted-foreground">
-                  <li>• MetaMask wallet authentication</li>
+                  <li>• Secure email/password authentication</li>
                   <li>• Vote encryption</li>
                   <li>• One vote per registered user</li>
                   <li>• Vote receipts with proofs</li>

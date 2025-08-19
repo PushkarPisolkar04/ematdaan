@@ -1,21 +1,38 @@
-import { useState, useEffect } from "react";
-import { Shield, Clock, Users, Plus, Edit, Save, AlertTriangle, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { electionApi, candidateApi, authApi, isUserAdmin } from "@/lib/supabase";
-import { createElection } from '@/lib/api/election';
-
-interface Candidate {
-  id: string;
-  name: string;
-  party: string;
-  symbol: string;
-  election_id: string;
-}
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Users, 
+  Vote, 
+  Shield, 
+  Settings, 
+  Copy, 
+  Plus, 
+  Trash2, 
+  Eye, 
+  Calendar,
+  BarChart3,
+  UserPlus,
+  Key,
+  Building,
+  Mail,
+  Download,
+  HelpCircle,
+  Info,
+  Target
+} from 'lucide-react';
+import { 
+  createInvitationToken,
+  getUserOrganizations,
+  validateSession
+} from '@/lib/api/traditionalAuth';
+import { supabase } from '@/lib/supabase';
 
 interface Election {
   id: string;
@@ -23,670 +40,870 @@ interface Election {
   start_time: string;
   end_time: string;
   is_active: boolean;
-  candidates?: Candidate[];
+  total_votes: number;
+  candidates_count: number;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  joined_at: string;
+  is_active: boolean;
+}
+
+interface AccessToken {
+  id: string;
+  token: string;
+  role: string;
+  expires_at: string;
+  usage_limit: number;
+  used_count: number;
+  is_active: boolean;
 }
 
 const Admin = () => {
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(true);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isSigningUp, setIsSigningUp] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isLoading, setIsLoading] = useState(true);
+  const [organization, setOrganization] = useState<any>(null);
+  const [userRole, setUserRole] = useState('');
   const [elections, setElections] = useState<Election[]>([]);
-  const [selectedElection, setSelectedElection] = useState<Election | null>(null);
-  
-  // Set default times for new election
-  const getDefaultTimes = () => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setHours(start.getHours() + 1); // Default to 1 hour from now
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7); // Default to 7 days after start
+  const [users, setUsers] = useState<User[]>([]);
+  const [accessTokens, setAccessTokens] = useState<AccessToken[]>([]);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeElections: 0,
+    totalVotes: 0,
+    pendingInvitations: 0
+  });
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-    // Format to local timezone string
-    return {
-      startTime: start.toLocaleString('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(' ', 'T'),
-      endTime: end.toLocaleString('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(' ', 'T')
-    };
-  };
-
+  // Form states
   const [newElection, setNewElection] = useState({
     name: '',
-    ...getDefaultTimes()
+    startDate: '',
+    endDate: '',
+    description: ''
   });
-
-  const [newCandidate, setNewCandidate] = useState({
-    name: "",
-    party: "",
-    symbol: ""
+  const [invitationForm, setInvitationForm] = useState({
+    email: '',
+    role: 'voter',
+    expiresInDays: 7,
+    usageLimit: 1
   });
-  const [isLoading, setIsLoading] = useState(true);
-  
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await authApi.getSession();
-        const isAdmin = await isUserAdmin();
-        
-        if (!session || !isAdmin) {
-          setIsAuthorized(false);
-        } else {
-          setIsAuthorized(true);
-          // Load elections data
-          const electionsData = await electionApi.getSchedule();
-          if (electionsData) {
-            setElections(electionsData);
-            if (electionsData.length > 0) {
-              setSelectedElection(electionsData[0]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-        setIsAuthorized(false);
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
-
-    checkAuth();
+    checkAuthAndLoadData();
   }, []);
 
-  const handleSignIn = async () => {
-    try {
-      // First check if wallet is connected
-      const walletAddress = localStorage.getItem('wallet_address');
-      const adminAddress = import.meta.env.VITE_ADMIN_ADDRESS;
-      
-      if (!walletAddress || !adminAddress || walletAddress.toLowerCase() !== adminAddress.toLowerCase()) {
-        toast({
-          title: "Wallet Required",
-          description: "Please connect your admin wallet first",
-          variant: "destructive"
-        });
+  const checkAuthAndLoadData = async () => {
+      try {
+        const sessionToken = localStorage.getItem('session_token');
+        if (!sessionToken) {
+        navigate('/auth');
+          return;
+      }
+
+      const session = await validateSession(sessionToken);
+      if (!session) {
+          localStorage.clear();
+        navigate('/auth');
         return;
       }
 
-      // Then try to sign in
-      await authApi.signIn(adminEmail, adminPassword);
-      const isAdmin = await isUserAdmin();
-      
-      if (!isAdmin) {
-        toast({
-          title: "Access Denied",
-          description: "This account does not have admin privileges",
-          variant: "destructive"
-        });
-        await authApi.signOut();
+      const organizationId = localStorage.getItem('organization_id');
+      if (!organizationId) {
+        navigate('/auth');
         return;
       }
 
-      setIsAuthorized(true);
-      toast({
-        title: "Welcome Admin",
-        description: "Successfully signed in"
-      });
-
-      // Load elections data
-      const electionsData = await electionApi.getSchedule();
-      if (electionsData) {
-        setElections(electionsData);
-        if (electionsData.length > 0) {
-          setSelectedElection(electionsData[0]);
-        }
+      // Check if user has admin privileges
+      if (session.role !== 'org_owner' && session.role !== 'admin') {
+          navigate('/dashboard');
+        return;
       }
+
+      setUserRole(session.role);
+      await loadOrganizationData(organizationId);
+      await loadAllData(organizationId);
     } catch (error) {
-      console.error('Sign in error:', error);
-      toast({
-        title: "Authentication Failed",
-        description: error instanceof Error ? error.message : "Please check your credentials and try again",
-        variant: "destructive"
-      });
+      console.error('Auth check failed:', error);
+      navigate('/auth');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleElectionUpdate = async () => {
+  const loadOrganizationData = async (organizationId: string) => {
     try {
-      if (!newElection.name || !newElection.startTime || !newElection.endTime) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all election details",
-          variant: "destructive"
-        });
-        return;
-      }
+      const { data: org, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', organizationId)
+        .single();
 
-      const startDate = new Date(newElection.startTime);
-      const endDate = new Date(newElection.endTime);
-      const now = new Date();
+      if (error) throw error;
+      setOrganization(org);
+    } catch (error) {
+      console.error('Failed to load organization:', error);
+    }
+  };
 
-      // Convert dates to UTC for storage
-      const startUTC = startDate;
-      const endUTC = endDate;
+  const loadAllData = async (organizationId: string) => {
+    try {
+      await Promise.all([
+        loadElections(organizationId),
+        loadUsers(organizationId),
+        loadAccessTokens(organizationId),
+        loadStats(organizationId)
+      ]);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    }
+  };
 
-      // Validate dates
-      if (startDate >= endDate) {
-        toast({
-          title: "Invalid Dates",
-          description: "End time must be after start time",
-          variant: "destructive"
-        });
-        return;
-      }
+  const loadElections = async (organizationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('elections')
+        .select(`
+          id,
+          name,
+          start_time,
+          end_time,
+          is_active,
+          total_votes,
+          candidates(count)
+        `)
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
 
-      // Check if start time is too far in the past
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
+      if (error) throw error;
       
-      if (startDate < yesterday) {
-        toast({
-          title: "Invalid Start Time",
-          description: "Start time cannot be more than 24 hours in the past",
-          variant: "destructive"
-        });
-        return;
-      }
+      // Transform data to match Election interface
+      const transformedData = data?.map(election => ({
+        id: election.id,
+        name: election.name,
+        start_time: election.start_time,
+        end_time: election.end_time,
+        is_active: election.is_active,
+        total_votes: election.total_votes || 0,
+        candidates_count: election.candidates?.[0]?.count || 0
+      })) || [];
+      
+      setElections(transformedData);
+    } catch (error) {
+      console.error('Failed to load elections:', error);
+    }
+  };
 
-      // Use createElection to generate encryption keys and create the election
-      await createElection(newElection.name, startUTC, endUTC);
+  const loadUsers = async (organizationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_organizations')
+        .select(`
+          user_id,
+          role,
+          joined_at,
+          is_active,
+          auth_users (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
       
-      // Refresh elections list
-      const updatedElections = await electionApi.getSchedule();
-      setElections(updatedElections);
-      
+      const formattedUsers = data?.map(item => ({
+        id: item.auth_users?.[0]?.id || '',
+        name: item.auth_users?.[0]?.name || '',
+        email: item.auth_users?.[0]?.email || '',
+        role: item.role,
+        joined_at: item.joined_at,
+        is_active: item.is_active
+      })) || [];
+
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
+
+  const loadAccessTokens = async (organizationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('access_tokens')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAccessTokens(data || []);
+    } catch (error) {
+      console.error('Failed to load access tokens:', error);
+    }
+  };
+
+  const loadStats = async (organizationId: string) => {
+    try {
+      // Get total users
+      const { count: totalUsers } = await supabase
+        .from('user_organizations')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('is_active', true);
+
+      // Get active elections
+      const { count: activeElections } = await supabase
+        .from('elections')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('is_active', true);
+
+      // Get total votes
+      const { count: totalVotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+
+      // Get pending invitations (tokens not used)
+      const { count: pendingInvitations } = await supabase
+        .from('access_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .lt('used_count', 'usage_limit');
+
+      setStats({
+        totalUsers: totalUsers || 0,
+        activeElections: activeElections || 0,
+        totalVotes: totalVotes || 0,
+        pendingInvitations: pendingInvitations || 0
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  const handleCreateInvitation = async () => {
+    if (!invitationForm.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const organizationId = localStorage.getItem('organization_id');
+      if (!organizationId) throw new Error('No organization found');
+
+      const token = await createInvitationToken({
+        organizationId,
+        role: invitationForm.role,
+        expiresInDays: invitationForm.expiresInDays,
+        usageLimit: invitationForm.usageLimit,
+        createdBy: localStorage.getItem('user_id') || ''
+      });
+
+      // Generate invitation link
+      const invitationLink = `${window.location.origin}/auth?token=${token.token}`;
+
+      toast({
+        title: "Invitation Created",
+        description: "Invitation link has been generated successfully"
+      });
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(invitationLink);
+      toast({
+        title: "Link Copied",
+        description: "Invitation link has been copied to clipboard"
+      });
+
+      // Reset form and reload data
+      setInvitationForm({
+        email: '',
+        role: 'voter',
+        expiresInDays: 7,
+        usageLimit: 1
+      });
+      await loadAccessTokens(organizationId);
+      await loadStats(organizationId);
+    } catch (error) {
+      console.error('Failed to create invitation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create invitation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateElection = async () => {
+    if (!newElection.name.trim() || !newElection.startDate || !newElection.endDate) {
+        toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+        });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const organizationId = localStorage.getItem('organization_id');
+      if (!organizationId) throw new Error('No organization found');
+
+      const { data, error } = await supabase
+        .from('elections')
+        .insert({
+          name: newElection.name,
+          description: newElection.description,
+          start_time: newElection.startDate,
+          end_time: newElection.endDate,
+          organization_id: organizationId,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
       toast({
         title: "Election Created",
-        description: "The election has been scheduled successfully",
+        description: "New election has been created successfully"
       });
 
-      // Reset form with new default times
+      // Reset form and reload data
       setNewElection({
         name: '',
-        ...getDefaultTimes()
+        startDate: '',
+        endDate: '',
+        description: ''
       });
+      await loadElections(organizationId);
+      await loadStats(organizationId);
     } catch (error) {
-      console.error('Error updating election:', error);
+      console.error('Failed to create election:', error);
       toast({
-        title: "Update Failed",
-        description: error instanceof Error ? error.message : "Failed to create election. Please try again.",
+        title: "Error",
+        description: "Failed to create election",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAddCandidate = async () => {
+  const copyToClipboard = async (text: string) => {
     try {
-      if (!selectedElection) {
-        toast({
-          title: "No Election Selected",
-          description: "Please select an election to add candidates to",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (!newCandidate.name || !newCandidate.party || !newCandidate.symbol) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all candidate details",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      await candidateApi.add({
-        ...newCandidate,
-        electionId: selectedElection.id
-      });
-
-      // Refresh elections list to get updated candidates
-      const updatedElections = await electionApi.getSchedule();
-      setElections(updatedElections);
-      
-      // Update selected election
-      const updatedSelectedElection = updatedElections.find(e => e.id === selectedElection.id);
-      if (updatedSelectedElection) {
-        setSelectedElection(updatedSelectedElection);
-      }
-
-      // Reset form
-      setNewCandidate({
-        name: "",
-        party: "",
-        symbol: ""
-      });
-
+      await navigator.clipboard.writeText(text);
       toast({
-        title: "Candidate Added",
-        description: "The candidate has been added successfully",
+        title: "Copied",
+        description: "Text copied to clipboard"
       });
     } catch (error) {
-      console.error('Error adding candidate:', error);
       toast({
-        title: "Failed to Add",
-        description: error instanceof Error ? error.message : "Could not add the candidate",
+        title: "Error",
+        description: "Failed to copy to clipboard",
         variant: "destructive"
       });
     }
   };
 
-  const handleRemoveCandidate = async (id: string) => {
-    try {
-      await candidateApi.remove(id);
-      
-      // Refresh elections list to get updated candidates
-      const updatedElections = await electionApi.getSchedule();
-      setElections(updatedElections);
-      
-      // Update selected election
-      const updatedSelectedElection = updatedElections.find(e => e.id === selectedElection?.id);
-      if (updatedSelectedElection) {
-        setSelectedElection(updatedSelectedElection);
-      }
-
-      toast({
-        title: "Candidate Removed",
-        description: "The candidate has been removed successfully",
-      });
-    } catch (error) {
-      console.error('Error removing candidate:', error);
-      toast({
-        title: "Failed to Remove",
-        description: error instanceof Error ? error.message : "Could not remove the candidate",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSignUp = async () => {
-    try {
-      if (adminPassword !== confirmPassword) {
-        toast({
-          title: "Password Mismatch",
-          description: "Passwords do not match",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (adminPassword.length < 6) {
-        toast({
-          title: "Invalid Password",
-          description: "Password must be at least 6 characters long",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      await authApi.signUp(adminEmail, adminPassword);
-      toast({
-        title: "Admin Account Created",
-        description: "Please check your email for verification link",
-      });
-      setIsSigningUp(false);
-    } catch (error) {
-      console.error('Sign up error:', error);
-      toast({
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Failed to create admin account",
-        variant: "destructive"
-      });
-    }
-  };
-
-  if (isAuthenticating) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="container mx-auto p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{isSigningUp ? "Create Admin Account" : "Admin Authentication"}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="admin@example.com"
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                />
-              </div>
-              {isSigningUp && (
-                <div>
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-              )}
-              <div className="flex flex-col space-y-2">
-                <Button onClick={isSigningUp ? handleSignUp : handleSignIn}>
-                  {isSigningUp ? "Create Account" : "Sign In"}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setIsSigningUp(!isSigningUp);
-                    setAdminPassword('');
-                    setConfirmPassword('');
-                  }}
-                >
-                  {isSigningUp ? "Back to Sign In" : "First Time Setup"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50 pt-16">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm py-4">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-              <div className="bg-[#6B21E8]/10 p-2 rounded-lg">
-                <Shield className="h-6 w-6 text-[#6B21E8]" />
-              </div>
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-sm text-gray-600">Election Management System</p>
-              </div>
+      <div className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+              <Badge variant="secondary">
+                {organization?.name}
+              </Badge>
+              <Badge variant={userRole === 'org_owner' ? 'default' : 'outline'}>
+                {userRole === 'org_owner' ? 'Owner' : 'Admin'}
+              </Badge>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/')}
-              className="border-[#6B21E8] text-[#6B21E8] hover:bg-[#6B21E8]/5"
-            >
-              Exit Dashboard
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Create Election */}
-          <div className="lg:col-span-2">
-            <Card className="shadow-md">
-              <CardHeader className="border-b bg-white">
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-              Create New Election
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Admin Guidance Section */}
+        <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-xl text-blue-800">
+              <Target className="h-6 w-6" />
+              Admin Quick Guide
             </CardTitle>
+            <CardDescription>
+              Manage your organization and elections efficiently
+            </CardDescription>
           </CardHeader>
-              <CardContent className="space-y-6 p-6">
-                <div className="grid gap-6">
-                  <div>
-                <Label htmlFor="electionName">Election Name</Label>
-                <Input
-                  id="electionName"
-                  value={newElection.name}
-                  onChange={(e) => setNewElection(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. General Election 2024"
-                      className="mt-1"
-                />
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+                <Key className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm text-blue-800">Access Codes</h4>
+                  <p className="text-xs text-gray-600">Generate and manage voter/admin codes</p>
+                </div>
               </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                <Label htmlFor="startTime">Start Time</Label>
-                <Input
-                  id="startTime"
-                  type="datetime-local"
-                  value={newElection.startTime}
-                  onChange={(e) => setNewElection(prev => ({ ...prev, startTime: e.target.value }))}
-                        className="mt-1"
-                />
+              
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+                <Vote className="h-5 w-5 text-purple-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm text-purple-800">Elections</h4>
+                  <p className="text-xs text-gray-600">Create and monitor voting processes</p>
+                </div>
               </div>
-                    <div>
-                <Label htmlFor="endTime">End Time</Label>
-                <Input
-                  id="endTime"
-                  type="datetime-local"
-                  value={newElection.endTime}
-                  onChange={(e) => setNewElection(prev => ({ ...prev, endTime: e.target.value }))}
-                        className="mt-1"
-                />
+              
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+                <Users className="h-5 w-5 text-green-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm text-green-800">Members</h4>
+                  <p className="text-xs text-gray-600">Manage organization users</p>
+                </div>
               </div>
             </div>
-                </div>
-            <Button 
-              onClick={handleElectionUpdate}
-                  className="w-full bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
-            >
-              Create Election
-            </Button>
+            
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">
+                <strong>Tip:</strong> Create separate access codes for voters and admins, and monitor election progress regularly.
+              </p>
+            </div>
           </CardContent>
         </Card>
-          </div>
 
-          {/* Right Column - Admin Restrictions */}
-          <div>
-            <Card className="shadow-md bg-white">
-              <CardHeader className="border-b">
-                <CardTitle className="text-gray-900">
-                  Admin Privileges
-                </CardTitle>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="elections">Elections</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+        {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">
+                    Active members in your organization
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Elections</CardTitle>
+                  <Vote className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+            <CardContent>
+                  <div className="text-2xl font-bold">{stats.activeElections}</div>
+              <p className="text-xs text-muted-foreground">
+                    Currently running elections
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Votes</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalVotes}</div>
+              <p className="text-xs text-muted-foreground">
+                    Votes cast across all elections
+              </p>
+          </CardContent>
+        </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Invitations</CardTitle>
+                  <Mail className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-medium text-red-800 mb-3">Restricted Actions</h4>
-                    <ul className="space-y-2 text-sm text-gray-600">
-                      <li className="flex items-center gap-2">
-                        <span className="text-red-500">•</span>
-                        Cast votes
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-red-500">•</span>
-                        Access user homepage
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-red-500">•</span>
-                        View individual votes
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-red-500">•</span>
-                        Modify submitted votes
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-red-500">•</span>
-                        Access user DIDs
-                      </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-green-800 mb-3">Allowed Actions</h4>
-                    <ul className="space-y-2 text-sm text-gray-600">
-                      <li className="flex items-center gap-2">
-                        <span className="text-green-500">•</span>
-                        Create multiple elections
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-green-500">•</span>
-                        Set election schedules
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-green-500">•</span>
-                        Add candidates to elections
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-green-500">•</span>
-                        Monitor election status
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="text-green-500">•</span>
-                        View aggregate statistics
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+            <CardContent>
+                  <div className="text-2xl font-bold">{stats.pendingInvitations}</div>
+              <p className="text-xs text-muted-foreground">
+                    Unused invitation links
+              </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Full Width - Manage Elections */}
-          <div className="lg:col-span-3">
-            <Card className="shadow-md">
-              <CardHeader className="border-b bg-white">
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-              Manage Elections
-            </CardTitle>
-          </CardHeader>
-              <CardContent className="p-6">
-            {elections.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                No elections created yet
-              </div>
-            ) : (
-                  <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                      <Label className="min-w-[120px]">Select Election:</Label>
-                  <select
-                        className="flex-1 h-10 rounded-md border border-input bg-white px-3 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6B21E8]"
-                    value={selectedElection?.id || ''}
-                    onChange={(e) => {
-                      const election = elections.find(el => el.id === e.target.value);
-                      setSelectedElection(election || null);
-                    }}
-                  >
-                    <option value="">Select an election...</option>
-                    {elections.map((election) => (
-                      <option key={election.id} value={election.id}>
-                        {election.name} ({new Date(election.start_time).toLocaleDateString()} - {new Date(election.end_time).toLocaleDateString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>
+                  Common administrative tasks
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button 
+                onClick={() => setActiveTab('elections')}
+                  className="flex items-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Create Election</span>
+                </Button>
+                <Button 
+                  onClick={() => setActiveTab('invitations')}
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Invite Users</span>
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export Data</span>
+                </Button>
+              </CardContent>
+            </Card>
 
-                {selectedElection && (
-                      <div className="space-y-6">
-                        <div className="bg-slate-50 rounded-lg p-4">
-                          <h3 className="font-medium text-gray-900 mb-2">{selectedElection.name}</h3>
-                          <p className="text-sm text-gray-600">
-                        Start: {new Date(selectedElection.start_time).toLocaleString()}
-                        <br />
-                        End: {new Date(selectedElection.end_time).toLocaleString()}
-                      </p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            All times are shown in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
-                          </p>
-                    </div>
-
-                    {/* Add Candidate Form */}
-                    <div className="space-y-4">
-                          <h3 className="font-medium text-gray-900">Add New Candidate</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                          <Label htmlFor="candidateName">Name</Label>
-                          <Input
-                            id="candidateName"
-                            value={newCandidate.name}
-                            onChange={(e) => setNewCandidate(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Candidate Name"
-                                className="mt-1"
-                          />
-                        </div>
-                            <div>
-                              <Label htmlFor="candidateParty">Party</Label>
-                          <Input
-                                id="candidateParty"
-                            value={newCandidate.party}
-                            onChange={(e) => setNewCandidate(prev => ({ ...prev, party: e.target.value }))}
-                            placeholder="Party Name"
-                                className="mt-1"
-                          />
-                        </div>
-                            <div>
-                              <Label htmlFor="candidateSymbol">Symbol</Label>
-                          <Input
-                                id="candidateSymbol"
-                            value={newCandidate.symbol}
-                            onChange={(e) => setNewCandidate(prev => ({ ...prev, symbol: e.target.value }))}
-                                placeholder="🌟"
-                                className="mt-1"
-                          />
-                        </div>
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {elections.slice(0, 3).map((election) => (
+                    <div key={election.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{election.name}</h4>
+                        <p className="text-sm text-gray-600">
+                          {election.total_votes} votes • {election.candidates_count} candidates
+                        </p>
                       </div>
-                          <Button 
-                            onClick={handleAddCandidate}
-                            className="w-full bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
-                          >
-                        Add Candidate
+                      <Badge variant={election.is_active ? "default" : "secondary"}>
+                        {election.is_active ? "Active" : "Ended"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Elections Tab */}
+          <TabsContent value="elections" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Election</CardTitle>
+                <CardDescription>
+                  Set up a new voting event for your organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="election-name">Election Name</Label>
+                    <Input
+                      id="election-name"
+                      value={newElection.name}
+                      onChange={(e) => setNewElection({ ...newElection, name: e.target.value })}
+                      placeholder="Enter election name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="election-description">Description</Label>
+                    <Input
+                      id="election-description"
+                      value={newElection.description}
+                      onChange={(e) => setNewElection({ ...newElection, description: e.target.value })}
+                      placeholder="Enter description"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <Input
+                      id="start-date"
+                      type="datetime-local"
+                      value={newElection.startDate}
+                      onChange={(e) => setNewElection({ ...newElection, startDate: e.target.value })}
+                    />
+                  </div>
+                            <div>
+                    <Label htmlFor="end-date">End Date</Label>
+                    <Input
+                      id="end-date"
+                      type="datetime-local"
+                      value={newElection.endDate}
+                      onChange={(e) => setNewElection({ ...newElection, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleCreateElection} disabled={isLoading}>
+                  {isLoading ? 'Creating...' : 'Create Election'}
+                      </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>All Elections</CardTitle>
+              </CardHeader>
+              <CardContent>
+                    <div className="space-y-4">
+                  {elections.map((election) => (
+                    <div key={election.id} className="flex items-center justify-between p-4 border rounded-lg">
+                                <div>
+                                <h4 className="font-medium">{election.name}</h4>
+                                <p className="text-sm text-gray-600">
+                          {new Date(election.start_time).toLocaleDateString()} - {new Date(election.end_time).toLocaleDateString()}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {election.total_votes} votes • {election.candidates_count} candidates
+                                </p>
+                                </div>
+                              <div className="flex items-center space-x-2">
+                        <Badge variant={election.is_active ? "default" : "secondary"}>
+                          {election.is_active ? "Active" : "Ended"}
+                        </Badge>
+                                <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization Members</CardTitle>
+                <CardDescription>
+                  Manage users in your organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{user.name}</h4>
+                        <p className="text-sm text-gray-600">{user.email}</p>
+                        <p className="text-sm text-gray-600">
+                          Joined {new Date(user.joined_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={user.role === 'org_owner' ? 'default' : 'outline'}>
+                          {user.role === 'org_owner' ? 'Owner' : user.role}
+                        </Badge>
+                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+          </TabsContent>
+
+          {/* Invitations Tab */}
+          <TabsContent value="invitations" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Invitation</CardTitle>
+                <CardDescription>
+                  Generate secure invitation links for new users
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="invite-email">Email (Optional)</Label>
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      value={invitationForm.email}
+                      onChange={(e) => setInvitationForm({ ...invitationForm, email: e.target.value })}
+                      placeholder="Enter email for tracking"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="invite-role">Role</Label>
+                    <select
+                      id="invite-role"
+                      value={invitationForm.role}
+                      onChange={(e) => setInvitationForm({ ...invitationForm, role: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="voter">Voter</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="expires-in">Expires In (Days)</Label>
+                    <Input
+                      id="expires-in"
+                      type="number"
+                      value={invitationForm.expiresInDays}
+                      onChange={(e) => setInvitationForm({ ...invitationForm, expiresInDays: parseInt(e.target.value) })}
+                      min="1"
+                      max="30"
+                    />
+              </div>
+              <div>
+                    <Label htmlFor="usage-limit">Usage Limit</Label>
+                    <Input
+                      id="usage-limit"
+                      type="number"
+                      value={invitationForm.usageLimit}
+                      onChange={(e) => setInvitationForm({ ...invitationForm, usageLimit: parseInt(e.target.value) })}
+                      min="1"
+                      max="100"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleCreateInvitation} disabled={isLoading}>
+                  {isLoading ? 'Creating...' : 'Create Invitation'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Access Codes</CardTitle>
+                <CardDescription>
+                  Your organization's access codes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">Voter Access Code</Label>
+                      <Badge variant="outline">Voter</Badge>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        value={organization?.voter_access_code || 'Not set'}
+                        readOnly
+                        className="font-mono"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(organization?.voter_access_code || '')}
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                     </div>
-
-                    <div className="space-y-4">
-                          <h3 className="font-medium text-gray-900 mb-4">Current Candidates</h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        {selectedElection.candidates && selectedElection.candidates.length > 0 ? (
-                          selectedElection.candidates.map((candidate) => (
-                            <div
-                              key={candidate.id}
-                                  className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm"
-                            >
-                              <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 flex items-center justify-center bg-[#6B21E8]/10 rounded-full">
-                                      <span className="text-[#6B21E8]">{candidate.symbol}</span>
-                                    </div>
-                                <div>
-                                      <h4 className="font-medium text-gray-900">{candidate.name}</h4>
-                                      <p className="text-sm text-gray-600">{candidate.party}</p>
-                                </div>
-                              </div>
-                              <Button
-                                    variant="outline"
-                                size="icon"
-                                onClick={() => handleRemoveCandidate(candidate.id)}
-                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))
-                        ) : (
-                              <div className="text-center py-8 text-gray-500 bg-slate-50 rounded-lg">
-                            No candidates added yet
-                          </div>
-                        )}
-                      </div>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">Admin Access Code</Label>
+                      <Badge variant="outline">Admin</Badge>
+              </div>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        value={organization?.admin_access_code || 'Not set'}
+                        readOnly
+                        className="font-mono"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(organization?.admin_access_code || '')}
+                      >
+                        <Copy className="h-4 w-4" />
+                  </Button>
                     </div>
                   </div>
-                )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Invitations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {accessTokens.map((token) => (
+                    <div key={token.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={token.role === 'admin' ? 'default' : 'outline'}>
+                            {token.role}
+                          </Badge>
+                          <Badge variant={token.is_active ? 'default' : 'secondary'}>
+                            {token.is_active ? 'Active' : 'Expired'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Used {token.used_count}/{token.usage_limit} times
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Expires {new Date(token.expires_at).toLocaleDateString()}
+                        </p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(`${window.location.origin}/auth?token=${token.token}`)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
               </div>
             </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

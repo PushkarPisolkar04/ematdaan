@@ -67,25 +67,324 @@ export interface User {
 export interface Database {
   public: {
     Tables: {
-      elections: {
-        Row: Election;
-        Insert: Omit<Election, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Election, 'id' | 'created_at' | 'updated_at'>>;
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          domain: string | null;
+          logo_url: string | null;
+          settings: any;
+          subscription_tier: string;
+          max_users: number;
+          max_elections: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          domain?: string | null;
+          logo_url?: string | null;
+          settings?: any;
+          subscription_tier?: string;
+          max_users?: number;
+          max_elections?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          domain?: string | null;
+          logo_url?: string | null;
+          settings?: any;
+          subscription_tier?: string;
+          max_users?: number;
+          max_elections?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
       };
-      candidates: {
-        Row: Candidate;
-        Insert: Omit<Candidate, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Candidate, 'id' | 'created_at' | 'updated_at'>>;
+      organization_admins: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          email: string;
+          name: string;
+          role: string;
+          permissions: any;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          email: string;
+          name: string;
+          role?: string;
+          permissions?: any;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          user_id?: string;
+          email?: string;
+          name?: string;
+          role?: string;
+          permissions?: any;
+          created_at?: string;
+          updated_at?: string;
+        };
       };
-      votes: {
-        Row: Vote;
-        Insert: Omit<Vote, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Vote, 'id' | 'created_at' | 'updated_at'>>;
+      auth_users: {
+        Row: {
+          id: string;
+          email: string;
+          password_hash: string;
+          organization_id: string;
+          role: string;
+          is_verified: boolean;
+          verification_token: string | null;
+          reset_token: string | null;
+          reset_token_expires: string | null;
+          last_login: string | null;
+          login_attempts: number;
+          is_locked: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          password_hash: string;
+          organization_id: string;
+          role?: string;
+          is_verified?: boolean;
+          verification_token?: string | null;
+          reset_token?: string | null;
+          reset_token_expires?: string | null;
+          last_login?: string | null;
+          login_attempts?: number;
+          is_locked?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          password_hash?: string;
+          organization_id?: string;
+          role?: string;
+          is_verified?: boolean;
+          verification_token?: string | null;
+          reset_token?: string | null;
+          reset_token_expires?: string | null;
+          last_login?: string | null;
+          login_attempts?: number;
+          is_locked?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_token: string;
+          organization_id: string;
+          ip_address: string | null;
+          user_agent: string | null;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_token: string;
+          organization_id: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          session_token?: string;
+          organization_id?: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          expires_at?: string;
+          created_at?: string;
+        };
       };
       users: {
-        Row: User;
-        Insert: Omit<User, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>;
+        Row: {
+          id: string;
+          address: string;
+          did: string;
+          email: string;
+          name: string;
+          dob: string;
+          has_voted: boolean;
+          vote_receipt: string | null;
+          organization_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          address: string;
+          did: string;
+          email: string;
+          name: string;
+          dob: string;
+          has_voted?: boolean;
+          vote_receipt?: string | null;
+          organization_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          address?: string;
+          did?: string;
+          email?: string;
+          name?: string;
+          dob?: string;
+          has_voted?: boolean;
+          vote_receipt?: string | null;
+          organization_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      elections: {
+        Row: {
+          id: string;
+          name: string;
+          start_time: string;
+          end_time: string;
+          is_active: boolean;
+          total_votes: number;
+          total_registered: number;
+          encryption_keys: any;
+          merkle_root: string | null;
+          blockchain_tx_hash: string | null;
+          organization_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          start_time: string;
+          end_time: string;
+          is_active?: boolean;
+          total_votes?: number;
+          total_registered?: number;
+          encryption_keys?: any;
+          merkle_root?: string | null;
+          blockchain_tx_hash?: string | null;
+          organization_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          start_time?: string;
+          end_time?: string;
+          is_active?: boolean;
+          total_votes?: number;
+          total_registered?: number;
+          encryption_keys?: any;
+          merkle_root?: string | null;
+          blockchain_tx_hash?: string | null;
+          organization_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      candidates: {
+        Row: {
+          id: string;
+          election_id: string;
+          name: string;
+          party: string;
+          symbol: string;
+          votes: number;
+          organization_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          election_id: string;
+          name: string;
+          party: string;
+          symbol: string;
+          votes?: number;
+          organization_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          election_id?: string;
+          name?: string;
+          party?: string;
+          symbol?: string;
+          votes?: number;
+          organization_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      votes: {
+        Row: {
+          id: string;
+          election_id: string;
+          candidate_id: string;
+          voter_did: string;
+          encrypted_vote: string;
+          merkle_proof: any;
+          organization_id: string;
+          created_at: string;
+          updated_at: string;
+      };
+        Insert: {
+          id?: string;
+          election_id: string;
+          candidate_id: string;
+          voter_did: string;
+          encrypted_vote: string;
+          merkle_proof?: any;
+          organization_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          election_id?: string;
+          candidate_id?: string;
+          voter_did?: string;
+          encrypted_vote?: string;
+          merkle_proof?: any;
+          organization_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
       };
     };
     Views: {

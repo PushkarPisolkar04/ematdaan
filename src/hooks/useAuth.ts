@@ -1,91 +1,91 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { connectMetaMask, disconnectMetaMask, getCurrentAddress } from '@/lib/metamask';
-import { generateDID } from '@/lib/did';
 import { sendOTP, verifyOTP } from '@/lib/otp';
 import { supabase } from '@/lib/supabase';
 
 export interface AuthState {
   isAuthenticated: boolean;
-  isConnected: boolean;
-  address: string | null;
-  did: string | null;
-  isAdmin: boolean;
+  userId: string | null;
+  email: string | null;
+  name: string | null;
+  role: string | null;
+  organizationId: string | null;
 }
 
 interface AuthUser {
   id: string;
   email: string;
-  address: string;
-  // Add other user properties as needed
+  name: string;
+  role: string;
+  organization_id: string;
 }
 
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
-    isConnected: false,
-    address: null,
-    did: null,
-    isAdmin: false,
+    userId: null,
+    email: null,
+    name: null,
+    role: null,
+    organizationId: null,
   });
 
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Initialize auth state from localStorage and check MetaMask connection
+  // Initialize auth state from localStorage
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check localStorage first
-        const storedAuth = localStorage.getItem('auth');
-        const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-        const userDID = localStorage.getItem('userDID');
+        const sessionToken = localStorage.getItem('session_token');
+        const userId = localStorage.getItem('user_id');
+        const email = localStorage.getItem('user_email');
+        const name = localStorage.getItem('user_name');
+        const role = localStorage.getItem('user_role');
+        const organizationId = localStorage.getItem('organization_id');
         
-        if (storedAuth) {
-          const parsedAuth = JSON.parse(storedAuth);
-          
-          // Verify MetaMask is still connected
-          const currentAddress = await getCurrentAddress();
-          if (currentAddress && currentAddress.toLowerCase() === parsedAuth.address?.toLowerCase()) {
-            // Still connected, restore full auth state
+        if (sessionToken && userId && email) {
+          // Verify session is still valid
+          const { data: session, error } = await supabase
+            .from('user_sessions')
+            .select('*')
+            .eq('token', sessionToken)
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .single();
+
+          if (session && !error) {
             setAuthState({
-              ...parsedAuth,
-              isAuthenticated: isAuthenticated,
-              did: userDID,
-              isConnected: true,
-              address: currentAddress
+              isAuthenticated: true,
+              userId,
+              email,
+              name,
+              role,
+              organizationId,
             });
             return;
           }
         }
 
-        // If we get here, either no stored auth or MetaMask disconnected
-        const currentAddress = await getCurrentAddress();
-        if (currentAddress) {
-          const isAdmin = currentAddress.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS?.toLowerCase();
-          const newState = {
-            isConnected: true,
-            address: currentAddress,
-            isAdmin,
-            isAuthenticated: isAuthenticated,
-            did: userDID
-          };
-          setAuthState(newState);
-          localStorage.setItem('auth', JSON.stringify(newState));
-        } else {
-          // No connection, clear auth state
-          setAuthState({
-            isAuthenticated: false,
-            isConnected: false,
-            address: null,
-            did: null,
-            isAdmin: false
-          });
-          localStorage.removeItem('auth');
-          if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
-            navigate('/');
-          }
+        // Invalid or expired session, clear auth state
+        setAuthState({
+          isAuthenticated: false,
+          userId: null,
+          email: null,
+          name: null,
+          role: null,
+          organizationId: null,
+        });
+        localStorage.removeItem('session_token');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('user_name');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('organization_id');
+        
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+          navigate('/');
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -93,104 +93,12 @@ export const useAuth = () => {
     };
 
     initializeAuth();
-
-    // Listen for account changes
-    const handleAccountsChanged = async (accounts: string[]) => {
-      if (accounts.length === 0) {
-        // User disconnected
-        setAuthState({
-          isAuthenticated: false,
-          isConnected: false,
-          address: null,
-          did: null,
-          isAdmin: false
-        });
-        localStorage.removeItem('auth');
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('userDID');
-        navigate('/');
-      } else {
-        // Account changed
-        const newAddress = accounts[0];
-        const isAdmin = newAddress.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS?.toLowerCase();
-        const newState = {
-          ...authState,
-          isConnected: true,
-          address: newAddress,
-          isAdmin,
-          isAuthenticated: false,
-          did: null
-        };
-        setAuthState(newState);
-        localStorage.setItem('auth', JSON.stringify(newState));
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('userDID');
-      }
-    };
-
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      // Also listen for chainChanged
-      window.ethereum.on('chainChanged', () => {
-        // Reload the page on chain change as recommended by MetaMask
-        window.location.reload();
-      });
-      
-      return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', () => {});
-      };
-    }
   }, [navigate]);
 
-  // Save auth state to localStorage
-  useEffect(() => {
-    if (authState.isAuthenticated) {
-      localStorage.setItem('auth', JSON.stringify(authState));
-    } else {
-      localStorage.removeItem('auth');
-    }
-  }, [authState]);
-
-  // Connect to MetaMask
-  const connect = useCallback(async () => {
-    try {
-      const { address } = await connectMetaMask();
-      const isAdmin = address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS?.toLowerCase();
-
-      setAuthState((prev) => ({
-        ...prev,
-        isConnected: true,
-        address,
-        isAdmin,
-      }));
-
-      return { address, isAdmin };
-    } catch (error) {
-      toast({
-        title: 'Connection Failed',
-        description: 'Please make sure MetaMask is installed and unlocked',
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  }, [toast]);
-
   // Register new user
-  const register = useCallback(async (
-    email: string,
-    name: string,
-    dob: string
-  ) => {
+  const register = useCallback(async (email: string, name: string, dob: string) => {
     try {
-      if (!authState.address) {
-        throw new Error('Wallet not connected');
-      }
-
-      // Generate DID
-      const didDoc = await generateDID(authState.address);
-
-      // Send OTP
+      // Send OTP for verification
       const otpResponse = await sendOTP(email);
       if (!otpResponse.success) {
         throw new Error(otpResponse.message);
@@ -201,7 +109,6 @@ export const useAuth = () => {
         email,
         name,
         dob,
-        did: didDoc.id,
       }));
 
       return otpResponse;
@@ -213,7 +120,7 @@ export const useAuth = () => {
       });
       throw error;
     }
-  }, [authState.address, toast]);
+  }, [toast]);
 
   // Complete registration with OTP
   const verifyRegistration = useCallback(async (otp: string) => {
@@ -223,7 +130,7 @@ export const useAuth = () => {
         throw new Error('Registration data not found');
       }
 
-      const { email, name, dob, did } = JSON.parse(registration);
+      const { email, name, dob } = JSON.parse(registration);
 
       // Verify OTP
       const otpResponse = await verifyOTP(email, otp);
@@ -231,11 +138,29 @@ export const useAuth = () => {
         throw new Error(otpResponse.message);
       }
 
+      // Create user account
+      const { data: user, error: userError } = await supabase
+        .from('auth_users')
+        .insert({
+          email,
+          name,
+          date_of_birth: dob,
+          is_verified: true,
+        })
+        .select()
+        .single();
+
+      if (userError) throw userError;
+
       // Update auth state
       setAuthState((prev) => ({
         ...prev,
         isAuthenticated: true,
-        did,
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: 'voter',
+        organizationId: null,
       }));
 
       // Clear temporary storage
@@ -292,15 +217,59 @@ export const useAuth = () => {
         throw new Error(otpResponse.message);
       }
 
-      // Generate DID
-      const didDoc = await generateDID(authState.address!);
+      // Get user data
+      const { data: user, error: userError } = await supabase
+        .from('auth_users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (userError) throw userError;
+
+      // Create session
+      const sessionToken = crypto.randomUUID();
+      const { error: sessionError } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: user.id,
+          token: sessionToken,
+          is_active: true,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+        });
+
+      if (sessionError) throw sessionError;
+
+      // Get user organization role
+      const { data: userOrg, error: orgError } = await supabase
+        .from('user_organizations')
+        .select('role, organization_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+
+      const role = userOrg?.role || 'voter';
+      const organizationId = userOrg?.organization_id || null;
 
       // Update auth state
       setAuthState((prev) => ({
         ...prev,
         isAuthenticated: true,
-        did: didDoc.id,
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role,
+        organizationId,
       }));
+
+      // Store in localStorage
+      localStorage.setItem('session_token', sessionToken);
+      localStorage.setItem('user_id', user.id);
+      localStorage.setItem('user_email', user.email);
+      localStorage.setItem('user_name', user.name);
+      localStorage.setItem('user_role', role);
+      if (organizationId) {
+        localStorage.setItem('organization_id', organizationId);
+      }
 
       // Clear temporary storage
       sessionStorage.removeItem('login_email');
@@ -317,25 +286,42 @@ export const useAuth = () => {
       });
       throw error;
     }
-  }, [authState.address, navigate, toast]);
+  }, [navigate, toast]);
 
   // Logout
   const logout = useCallback(async () => {
     try {
-      await disconnectMetaMask();
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        // Deactivate session
+        await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('token', sessionToken);
+      }
+
       setAuthState({
         isAuthenticated: false,
-        isConnected: false,
-        address: null,
-        did: null,
-        isAdmin: false,
+        userId: null,
+        email: null,
+        name: null,
+        role: null,
+        organizationId: null,
       });
-      localStorage.removeItem('auth');
+
+      // Clear localStorage
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('organization_id');
+
       navigate('/');
     } catch (error) {
       toast({
         title: 'Logout Failed',
-        description: 'Failed to disconnect from MetaMask',
+        description: 'Failed to logout properly',
         variant: 'destructive',
       });
     }
@@ -344,24 +330,24 @@ export const useAuth = () => {
   // Check if user is authenticated
   const checkAuth = useCallback(async () => {
     try {
-      const address = await getCurrentAddress();
-      if (!address) {
-        setAuthState((prev) => ({
-          ...prev,
-          isConnected: false,
-          address: null,
-        }));
+      const sessionToken = localStorage.getItem('session_token');
+      const userId = localStorage.getItem('user_id');
+      
+      if (!sessionToken || !userId) {
         return false;
       }
 
-      const isAdmin = address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS?.toLowerCase();
+      const { data: session, error } = await supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('token', sessionToken)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
 
-      setAuthState((prev) => ({
-        ...prev,
-        isConnected: true,
-        address,
-        isAdmin,
-      }));
+      if (error || !session) {
+        return false;
+      }
 
       return true;
     } catch (error) {
@@ -371,9 +357,8 @@ export const useAuth = () => {
 
   const handleLogin = async (userData: AuthUser) => {
     try {
-      // Your existing code using userData.id
       const { data: user, error } = await supabase
-        .from('users')
+        .from('auth_users')
         .select('*')
         .eq('id', userData.id)
         .single();
@@ -388,7 +373,6 @@ export const useAuth = () => {
 
   return {
     authState,
-    connect,
     register,
     verifyRegistration,
     login,

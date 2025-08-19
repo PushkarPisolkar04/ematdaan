@@ -137,7 +137,7 @@ export const getElectionStats = async () => {
       .select('id', { count: 'exact' })
       .eq('election_id', election.id);
 
-    const turnoutPercentage = (totalVotes || 0) / (totalUsers || 1) * 100;
+    const turnoutPercentage = Number(totalVotes || 0) / Number(totalUsers || 1) * 100;
 
     return {
       totalRegistered: totalUsers || 0,
@@ -222,7 +222,7 @@ export const getPastElections = async () => {
     console.error('Error fetching past elections:', error);
     return [];
   }
-};
+}; 
 
 export const getElectionProgress = (startTime: string, endTime: string): number => {
   const startMs = new Date(startTime).valueOf();

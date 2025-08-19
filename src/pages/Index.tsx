@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Vote, Shield, Users, Clock, CheckCircle, FileText, Eye, Wallet, Mail, Key } from "lucide-react";
+import { Vote, Shield, Users, Clock, CheckCircle, FileText, Eye, Mail, Key, ArrowRight, Star, Zap, Lock, Building, Info, HelpCircle, Target, Users2, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import CountdownTimer from "@/components/CountdownTimer";
@@ -12,9 +12,15 @@ import HowItWorks from "@/components/HowItWorks";
 import FAQSection from "@/components/FAQSection";
 import { getElectionStatus, getElectionStats } from "@/lib/api/election";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { electionApi } from "@/lib/supabase";
-import FeatureSection from "@/components/FeatureSection";
-import StatsSection from "@/components/StatsSection";
+import { electionApi } from '@/lib/supabase';
+import FeatureSection from '@/components/FeatureSection';
+import StatsSection from '@/components/StatsSection';
+import { fetchTodayStats, fetchPlatformStats, PlatformStats } from "@/lib/api/stats";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { createOrganization } from "@/lib/api/traditionalAuth";
+import Navbar from "@/components/Navbar";
+import { validateOrganizationForm } from "@/lib/validation";
 
 interface Election {
   id: string;
@@ -32,8 +38,40 @@ interface Election {
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
   const [activeElections, setActiveElections] = useState<Election[]>([]);
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
+  const [todayStats, setTodayStats] = useState({ votesToday: 0, usersToday: 0 });
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [showOrgForm, setShowOrgForm] = useState(false);
+  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
+  const [orgFormData, setOrgFormData] = useState({
+    name: '',
+    ownerName: '',
+    ownerEmail: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [orgFormErrors, setOrgFormErrors] = useState<{[key: string]: string}>({});
+
+  const handleFieldChange = (field: string, value: string) => {
+    setOrgFormData({ ...orgFormData, [field]: value });
+    if (orgFormErrors[field]) {
+      setOrgFormErrors({ ...orgFormErrors, [field]: '' });
+    }
+  };
+
+  useEffect(() => {
+    // Check if we should open the organization creation modal
+    const shouldCreateOrg = searchParams.get('createOrg');
+    if (shouldCreateOrg === 'true') {
+      setShowOrgForm(true);
+      // Clean up the URL
+      navigate('/', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     const fetchElections = async () => {
@@ -48,220 +86,481 @@ const Index = () => {
       }
     };
 
+    const fetchStats = async () => {
+      try {
+        const [todayData, platformData] = await Promise.all([
+          fetchTodayStats(),
+          fetchPlatformStats()
+        ]);
+        setTodayStats(todayData);
+        setPlatformStats(platformData);
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
     fetchElections();
+    fetchStats();
+
+    // Refresh stats every 30 seconds
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Clear previous errors
+    setOrgFormErrors({});
+    
+    // Validate form
+    const validation = validateOrganizationForm(orgFormData);
+    if (!validation.isValid) {
+      const errors: {[key: string]: string} = {};
+      validation.errors.forEach(error => {
+        errors[error.field] = error.message;
+      });
+      setOrgFormErrors(errors);
+      
+      // Show first error in toast
+      if (validation.errors.length > 0) {
+        toast({
+          title: "Validation Error",
+          description: validation.errors[0].message,
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    setIsCreatingOrg(true);
+    try {
+      const result = await createOrganization({
+        name: orgFormData.name,
+        ownerName: orgFormData.ownerName,
+        ownerEmail: orgFormData.ownerEmail,
+        ownerPassword: orgFormData.password
+      });
+
+      if (result.otpSent) {
+        toast({
+          title: "Organization Created Successfully!",
+          description: "Please check your email for verification code"
+        });
+        
+        // Navigate to auth page with organization context
+        navigate('/auth', { 
+          state: { 
+            organization: result.organization,
+            ownerEmail: orgFormData.ownerEmail,
+            mode: 'organization_created'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Organization creation error:', error);
+      toast({
+        title: "Creation Failed",
+        description: error instanceof Error ? error.message : 'Failed to create organization',
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingOrg(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <main className="pt-16">
-        {/* Hero Section */}
-        <section className="section-hero section-spacing">
-          <div className="container">
-            <div className="text-center max-w-4xl mx-auto">
-              <img src="/logo.png" alt="E-Matdaan Logo" className="h-20 w-auto mx-auto mb-6" />
-              
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 text-primary-color">
-                Welcome to eMatdaan
-              </h1>
-
-              <p className="text-xl text-[#6B21E8] mb-4">
-                A Secure Digital Voting System
-              </p>
-              
-              <p className="text-lg text-foreground/70 mb-8">
-                E-Matdaan combines database security with user-friendly design to deliver 
-                a voting platform that's secure and accessible. With encryption, 
-                MetaMask authentication, and vote verification through Merkle trees, 
-                we ensure your vote is counted correctly.
-              </p>
-
-              <div className="flex flex-wrap gap-4 justify-center mb-12">
-                <Button 
-                  onClick={() => navigate('/login')} 
-                  className="bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
-                >
-                  Start Voting
-                </Button>
-
-                <Button 
-                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                  variant="outline"
-                  className="border-[#6B21E8] hover:bg-[#6B21E8]/5"
-                >
-                  Learn More
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="card-feature p-6 text-center">
-                  <Shield className="h-8 w-8 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Secure</h3>
-                  <p className="text-sm text-foreground/70">MetaMask authentication</p>
+    <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      {/* Background Pattern Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-100/20 via-blue-50/30 to-indigo-100/20 pointer-events-none"></div>
+      <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM2QjIxRTgiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-40 pointer-events-none"></div>
+      
+      <main className="relative pt-20 w-full">
+        {/* Quick How to Vote Banner */}
+        <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white py-4">
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Target className="h-6 w-6 text-yellow-300" />
+                  <h3 className="text-lg font-semibold">How to Vote in 3 Simple Steps:</h3>
                 </div>
-                
-                <div className="card-feature p-6 text-center">
-                  <Eye className="h-8 w-8 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Verifiable</h3>
-                  <p className="text-sm text-foreground/70">Merkle tree verification</p>
-                </div>
-                
-                <div className="card-feature p-6 text-center">
-                  <CheckCircle className="h-8 w-8 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Reliable</h3>
-                  <p className="text-sm text-foreground/70">Database-backed storage</p>
+                <div className="flex items-center gap-6 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">1</span>
+                    <span>Get Access Code from your organization</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">2</span>
+                    <span>Sign in with the access code</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">3</span>
+                    <span>Cast your vote securely</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-          {/* Active Elections Section */}
-        <section className="section-elections section-spacing">
-          <div className="container">
-            <h2 className="text-3xl font-bold mb-8 text-center text-[#6B21E8]">
-              Active Elections
-            </h2>
+        {/* Hero Section */}
+        <section className="relative overflow-hidden py-8 w-full">
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                {/* Left side - Content */}
+                <motion.div
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="text-left"
+                >
+                  <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                    <span className="bg-gradient-to-r from-gray-900 via-purple-800 to-[#6B21E8] bg-clip-text text-transparent">
+                      The Future of
+                    </span>
+                    <br />
+                    <span className="text-gray-900">Secure Digital Voting</span>
+                  </h1>
 
-            {activeElections.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <Clock className="h-12 w-12 text-[#6B21E8]/60 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Active Elections</h3>
-                <p className="text-muted-foreground mb-6">
-                      There are currently no active elections. Please check back later.
-                    </p>
-                <Button 
-                  onClick={() => navigate('/results')} 
-                  variant="outline"
-                  className="border-[#6B21E8] hover:bg-[#6B21E8]/5 mr-4"
-                >
-                        View Past Results
-                      </Button>
-                <Button 
-                  onClick={() => navigate('/login')} 
-                  className="bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
-                >
-                        Login to Dashboard
-                      </Button>
+                  <p className="text-xl text-gray-700 mb-8 leading-relaxed max-w-2xl">
+                    Experience the most advanced voting platform with enterprise-grade security, 
+                    zero-knowledge proofs, and digital signatures. Your vote is protected by 
+                    cutting-edge cryptography and transparent verification systems.
+                  </p>
+
+                  {/* CTA Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                    <Button 
+                      onClick={() => navigate('/auth')}
+                      className="bg-gradient-to-r from-[#6B21E8] to-purple-600 hover:from-[#6B21E8]/90 hover:to-purple-600/90 text-white px-8 py-4 text-lg font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      Sign In / Register
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+
+                    <Button 
+                      onClick={() => setShowOrgForm(true)}
+                      variant="outline"
+                      className="border-2 border-[#6B21E8] text-[#6B21E8] hover:bg-[#6B21E8] hover:text-white px-8 py-4 text-lg font-semibold transition-all duration-300 transform hover:scale-105 bg-white/80 backdrop-blur-sm"
+                    >
+                      Create Organization
+                      <Building className="ml-2 h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  {/* Trust Indicators */}
+                  <div className="flex items-center gap-6 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-green-600" />
+                      <span>Bank-level Security</span>
                     </div>
-            ) : (
-              <div className="space-y-6">
-                  <Tabs
-                    defaultValue={activeElections[0]?.id}
-                  className="bg-white rounded-lg shadow-md overflow-hidden"
-                  >
-                  <TabsList className="w-full border-b bg-slate-50 p-0">
-                      {activeElections.map((election) => (
-                        <TabsTrigger 
-                          key={election.id} 
-                          value={election.id}
-                        className="flex-1 px-6 py-3 data-[state=active]:bg-[#6B21E8] data-[state=active]:text-white"
-                        >
-                          {election.name}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                      <span>Verified Transparent</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-purple-600" />
+                      <span>Zero-Knowledge Proofs</span>
+                    </div>
+                  </div>
+                </motion.div>
 
-                  {activeElections.map((election) => {
-                    const now = new Date();
-                    const startTime = new Date(election.start_time);
-                    const endTime = new Date(election.end_time);
-                    const isStarted = now >= startTime;
-                    const isEnded = now >= endTime;
-                    const isLive = isStarted && !isEnded;
+                {/* Right side - Visual */}
+                <motion.div
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  className="relative"
+                >
+                  <div className="relative">
+                    {/* Main Card */}
+                    <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Live Platform Stats</h3>
+                        <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                          🟢 Live
+                        </div>
+                      </div>
 
-                    return (
-                      <TabsContent key={election.id} value={election.id} className="p-6">
-                        <div className="text-center mb-8">
-                          <CountdownTimer 
-                            startTime={startTime}
-                            endTime={endTime}
-                          />
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl border border-purple-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-[#6B21E8] rounded-full animate-pulse shadow-lg"></div>
+                            <span className="font-medium">Votes Cast Today</span>
+                          </div>
+                          <span className={`text-2xl font-bold text-[#6B21E8] ${statsLoading ? 'animate-pulse' : ''}`}>
+                            {statsLoading ? '...' : todayStats.votesToday.toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl border border-green-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-emerald-700 rounded-full animate-pulse shadow-lg border-2 border-white"></div>
+                            <span className="font-medium">Total Users</span>
+                          </div>
+                          <span className={`text-2xl font-bold text-green-600 ${statsLoading ? 'animate-pulse' : ''}`}>
+                            {statsLoading ? '...' : (platformStats?.totalUsers || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-100 to-yellow-100 rounded-xl border border-orange-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 bg-orange-600 rounded-full animate-pulse shadow-lg"></div>
+                            <span className="font-medium">Active Elections</span>
+                          </div>
+                          <span className={`text-2xl font-bold text-orange-600 ${statsLoading ? 'animate-pulse' : ''}`}>
+                            {statsLoading ? '...' : activeElections.length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Real-time indicator */}
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 text-center">
+                          {statsLoading ? 'Loading...' : 'Updated in real-time • Last refresh: just now'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Floating Elements */}
+                    <div className="absolute -top-4 -right-4 bg-gradient-to-r from-[#6B21E8] to-purple-600 text-white p-3 rounded-xl shadow-lg">
+                      <Zap className="h-6 w-6" />
+                    </div>
+                    
+                    <div className="absolute -bottom-4 -left-4 bg-gradient-to-r from-[#6B21E8] to-purple-600 text-white p-3 rounded-xl shadow-lg">
+                      <Shield className="h-6 w-6" />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <FeatureSection />
+
+        {/* Live Elections Section */}
+        {activeElections.length > 0 && (
+          <section className="py-16 w-full bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-indigo-600/10 backdrop-blur-sm">
+            <div className="w-full px-4 sm:px-6 lg:px-8">
+              <div className="max-w-7xl mx-auto">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  viewport={{ once: true }}
+                  className="text-left mb-12"
+                >
+                  <h2 className="text-4xl font-bold mb-4 text-gray-900">Live Elections</h2>
+                  <p className="text-xl text-gray-600 max-w-3xl">
+                    Participate in ongoing elections and make your voice heard in real-time. 
+                    Each vote is encrypted, verified, and recorded securely for maximum integrity.
+                  </p>
+                </motion.div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {activeElections.map((election, index) => (
+                    <motion.div
+                      key={election.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-white/90 backdrop-blur-sm">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-3 text-xl">
+                            <div className="bg-gradient-to-r from-[#6B21E8] to-purple-600 p-3 rounded-xl">
+                              <Vote className="h-6 w-6 text-white" />
+                            </div>
+                            {election.name}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center gap-3 text-gray-600">
+                            <Clock className="h-5 w-5" />
+                            <span className="font-medium">
+                              Ends: {new Date(election.end_time).toLocaleDateString()}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="flex justify-between text-sm font-medium">
+                              <span className="text-gray-600">Progress</span>
+                              <span className="text-[#6B21E8]">{getElectionProgress(election.start_time, election.end_time)}%</span>
+                            </div>
+                            <Progress 
+                              value={getElectionProgress(election.start_time, election.end_time)} 
+                              className="h-3"
+                            />
+                          </div>
 
                           <Button 
                             onClick={() => navigate(`/vote/${election.id}`)}
-                            className={`w-full mt-4 ${
-                              isLive 
-                                ? "bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
-                                : "bg-slate-200 text-slate-600 cursor-not-allowed"
-                            }`}
-                            disabled={!isLive}
+                            className="w-full bg-gradient-to-r from-[#6B21E8] to-purple-600 hover:from-[#6B21E8]/90 hover:to-purple-600/90 text-white font-semibold py-3 shadow-lg hover:shadow-xl transition-all duration-300"
                           >
-                            {isLive ? "Cast your vote now" : isEnded ? "Voting has ended" : "Voting not started yet"}
+                            Vote Now
+                            <ArrowRight className="ml-2 h-5 w-5" />
                           </Button>
-                        </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <h4 className="font-medium mb-2">Live Statistics</h4>
-                            {isStarted ? (
-                              <LiveStats electionId={election.id} />
-                            ) : (
-                              <div className="bg-slate-50 rounded-lg p-4 text-center text-slate-600">
-                                Statistics will be available once voting begins
-                              </div>
-                            )}
-                          </div>
+        {/* Stats Section */}
+        <StatsSection />
 
-                          <div>
-                            <h4 className="font-medium mb-2">Candidates</h4>
-                            <div className="space-y-2">
-                              {election.candidates.map((candidate) => (
-                                <div key={candidate.id} className="bg-slate-50 rounded-lg p-3 flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-[#6B21E8]/10 flex items-center justify-center">
-                                      <div className="bg-white rounded-full p-2 shadow-sm">
-                                        {candidate.symbol}
-                                      </div>
-                                    </div>
-                                <div>
-                                  <div className="font-medium">{candidate.name}</div>
-                                  <div className="text-sm text-muted-foreground">{candidate.party}</div>
-                                    </div>
-                                </div>
-                              </div>
-                            ))}
-                            </div>
-                          </div>
-                        </div>
-                      </TabsContent>
-                    );
-                  })}
-                </Tabs>
-                    </div>
-            )}
-          </div>
-        </section>
+        {/* How It Works */}
+        <HowItWorks />
 
-          {/* Features Section */}
-        <section className="section-features section-spacing">
-          <div className="container">
-          <FeatureSection />
-          </div>
-        </section>
-
-          {/* How It Works Section */}
-        <section className="section-how-it-works section-spacing">
-          <div className="container">
-          <HowItWorks />
-          </div>
-        </section>
-
-          {/* Stats Section */}
-        <section className="section-stats section-spacing">
-          <div className="container">
-          <StatsSection />
-          </div>
-        </section>
-
-          {/* FAQ Section */}
-        <section className="section-faq section-spacing">
-          <div className="container">
-          <FAQSection />
-          </div>
-        </section>
+        {/* FAQ Section */}
+        <FAQSection />
       </main>
+
+      {/* Organization Creation Modal */}
+      {showOrgForm && (
+        <div id="create-organization" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Create Your Organization</CardTitle>
+              <CardDescription>
+                Set up your secure voting platform in minutes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateOrganization} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Organization Name
+                  </label>
+                  <Input
+                    type="text"
+                    value={orgFormData.name}
+                    onChange={(e) => handleFieldChange('name', e.target.value)}
+                    placeholder="Enter organization name"
+                    required
+                    className={orgFormErrors.name ? 'border-red-500' : ''}
+                  />
+                  {orgFormErrors.name && (
+                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.name}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Name
+                  </label>
+                  <Input
+                    type="text"
+                    value={orgFormData.ownerName}
+                    onChange={(e) => handleFieldChange('ownerName', e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                    className={orgFormErrors.ownerName ? 'border-red-500' : ''}
+                  />
+                  {orgFormErrors.ownerName && (
+                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.ownerName}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <Input
+                    type="email"
+                    value={orgFormData.ownerEmail}
+                    onChange={(e) => handleFieldChange('ownerEmail', e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    className={orgFormErrors.ownerEmail ? 'border-red-500' : ''}
+                  />
+                  {orgFormErrors.ownerEmail && (
+                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.ownerEmail}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <Input
+                    type="password"
+                    value={orgFormData.password}
+                    onChange={(e) => handleFieldChange('password', e.target.value)}
+                    placeholder="Create a password"
+                    required
+                    className={orgFormErrors.password ? 'border-red-500' : ''}
+                  />
+                  {orgFormErrors.password && (
+                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.password}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <Input
+                    type="password"
+                    value={orgFormData.confirmPassword}
+                    onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
+                    placeholder="Confirm your password"
+                    required
+                    className={orgFormErrors.confirmPassword ? 'border-red-500' : ''}
+                  />
+                  {orgFormErrors.confirmPassword && (
+                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.confirmPassword}</p>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button 
+                    type="submit" 
+                    className="flex-1" 
+                    disabled={isCreatingOrg}
+                  >
+                    {isCreatingOrg ? 'Creating...' : 'Create Organization'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => setShowOrgForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
+};
+
+// Helper function to calculate election progress
+const getElectionProgress = (startTime: string, endTime: string): number => {
+  const startMs = new Date(startTime).valueOf();
+  const endMs = new Date(endTime).valueOf();
+  const nowMs = Date.now();
+
+  if (nowMs < startMs) return 0;
+  if (nowMs > endMs) return 100;
+
+  const totalMs = endMs - startMs;
+  const elapsedMs = nowMs - startMs;
+  return Math.round((elapsedMs / totalMs) * 100);
 };
 
 export default Index;

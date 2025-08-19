@@ -1,166 +1,225 @@
-import { useState, useEffect } from "react";
-import { Shield, User, FileText, LogOut, CheckCircle, Clock, Users, Eye, Vote } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { generateVoteReceipt } from '@/lib/receipt';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Vote, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  ArrowRight, 
+  User,
+  Calendar,
+  BarChart3,
+  Info,
+  Target,
+  HelpCircle
+} from 'lucide-react';
+import { validateSession } from '@/lib/api/traditionalAuth';
 import { supabase } from '@/lib/supabase';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Election {
   id: string;
   name: string;
+  description: string;
   start_time: string;
   end_time: string;
   is_active: boolean;
-  candidates: Array<{
-    id: string;
-    name: string;
-    party: string;
-    symbol: string;
-  }>;
+  total_votes: number;
+  candidates_count: number;
+  has_voted: boolean;
 }
 
-interface DatabaseVote {
-  id: string;
-  election_id: string;
-  timestamp: string;
-  elections: {
-    name: string;
-  };
-}
-
-interface VoteHistoryItem {
-  election_id: string;
-  election_name: string;
-  vote_id: string;
-  timestamp: string;
+interface UserStats {
+  totalElections: number;
+  participatedElections: number;
+  upcomingElections: number;
+  activeElections: number;
 }
 
 const Dashboard = () => {
-  const [activeElections, setActiveElections] = useState<Election[]>([]);
-  const [voteHistory, setVoteHistory] = useState<VoteHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userDID, setUserDID] = useState("");
-  const [userData, setUserData] = useState<any>(null);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [organization, setOrganization] = useState<any>(null);
+  const [elections, setElections] = useState<Election[]>([]);
+  const [stats, setStats] = useState<UserStats>({
+    totalElections: 0,
+    participatedElections: 0,
+    upcomingElections: 0,
+    activeElections: 0
+  });
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      // Check if user is authenticated
-      const isAuth = localStorage.getItem('isAuthenticated');
-      if (!isAuth) {
-        navigate('/login');
+    checkAuthAndLoadData();
+  }, []);
+
+  const checkAuthAndLoadData = async () => {
+    try {
+      const sessionToken = localStorage.getItem('session_token');
+      if (!sessionToken) {
+        navigate('/auth');
         return;
       }
 
-      // Load user data
-      const did = localStorage.getItem('userDID');
-      if (!did) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        // Get user data
-        const { data: user, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('did', did)
-          .single();
-
-        if (userError) {
-          if (userError.code === 'PGRST116') {
-            console.error('User not found');
-            localStorage.clear();
-            navigate('/login');
-            return;
-          }
-          throw userError;
-        }
-
-        if (!user) {
-          console.error('User not found');
-          localStorage.clear();
-          navigate('/login');
-          return;
-        }
-
-        // Get active elections
-        const now = new Date().toISOString();
-        const { data: elections, error: electionError } = await supabase
-          .from('elections')
-          .select(`
-            *,
-            candidates (*)
-          `)
-          .eq('is_active', true)
-          .gte('end_time', now)
-          .order('start_time', { ascending: true });
-
-        if (electionError) throw electionError;
-
-        // Get user's vote history
-        const { data: votes, error: votesError } = await supabase
-          .from('votes')
-          .select(`
-            id,
-            election_id,
-            timestamp,
-            elections (
-              name
-            )
-          `)
-          .eq('voter_did', did)
-          .order('timestamp', { ascending: false });
-
-        if (votesError) throw votesError;
-
-        const history = (votes as unknown as DatabaseVote[])?.map(vote => ({
-          election_id: vote.election_id,
-          election_name: vote.elections.name,
-          vote_id: vote.id,
-          timestamp: vote.timestamp
-        })) || [];
-
-        setUserDID(did);
-        setUserData(user);
-        setActiveElections(elections || []);
-        setVoteHistory(history);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load user data. Please try logging in again.",
-          variant: "destructive"
-        });
+      const session = await validateSession(sessionToken);
+      if (!session) {
         localStorage.clear();
-        navigate('/login');
-      } finally {
-        setLoading(false);
+        navigate('/auth');
+        return;
       }
-    };
 
-    checkAuth();
-  }, [navigate, toast]);
+      const organizationId = localStorage.getItem('organization_id');
+      if (!organizationId) {
+        navigate('/auth');
+        return;
+      }
 
-  const handleLogout = () => {
-    localStorage.clear();
-    toast({
-      title: "Logged Out",
-      description: "MetaMask disconnected and session cleared",
-    });
-    navigate('/');
+      setUser(session);
+      await loadOrganizationData(organizationId);
+      await loadElections(organizationId, session.user_id);
+      await loadStats(organizationId, session.user_id);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      navigate('/auth');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  if (loading) {
+  const loadOrganizationData = async (organizationId: string) => {
+    try {
+      const { data: org, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', organizationId)
+        .single();
+
+      if (error) throw error;
+      setOrganization(org);
+    } catch (error) {
+      console.error('Failed to load organization:', error);
+    }
+  };
+
+  const loadElections = async (organizationId: string, userId: string) => {
+    try {
+      // Get all elections for the organization
+      const { data: electionsData, error: electionsError } = await supabase
+        .from('elections')
+        .select(`
+          id,
+          name,
+          description,
+          start_time,
+          end_time,
+          is_active,
+          total_votes,
+          candidates(count)
+        `)
+        .eq('organization_id', organizationId)
+        .order('start_time', { ascending: false });
+
+      if (electionsError) throw electionsError;
+
+      // Get user's voting history
+      const { data: votesData, error: votesError } = await supabase
+        .from('votes')
+        .select('election_id')
+        .eq('organization_id', organizationId)
+        .eq('voter_id', userId);
+
+      if (votesError) throw votesError;
+
+      const votedElectionIds = new Set(votesData?.map(vote => vote.election_id) || []);
+
+      // Combine election data with voting status
+      const electionsWithVoteStatus = electionsData?.map(election => ({
+        ...election,
+        candidates_count: election.candidates?.[0]?.count || 0,
+        has_voted: votedElectionIds.has(election.id)
+      })) || [];
+
+      setElections(electionsWithVoteStatus);
+    } catch (error) {
+      console.error('Failed to load elections:', error);
+    }
+  };
+
+  const loadStats = async (organizationId: string, userId: string) => {
+    try {
+      // Get total elections
+      const { count: totalElections } = await supabase
+        .from('elections')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+
+      // Get user's participated elections
+      const { count: participatedElections } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('voter_id', userId);
+
+      // Get upcoming elections
+      const { count: upcomingElections } = await supabase
+        .from('elections')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gt('start_time', new Date().toISOString());
+
+      // Get active elections
+      const { count: activeElections } = await supabase
+        .from('elections')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .lte('start_time', new Date().toISOString())
+        .gte('end_time', new Date().toISOString());
+
+      setStats({
+        totalElections: totalElections || 0,
+        participatedElections: participatedElections || 0,
+        upcomingElections: upcomingElections || 0,
+        activeElections: activeElections || 0
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  const getElectionStatus = (election: Election) => {
+    const now = new Date();
+    const startTime = new Date(election.start_time);
+    const endTime = new Date(election.end_time);
+
+    if (now < startTime) {
+      return { status: 'upcoming', color: 'bg-yellow-500', text: 'Upcoming', icon: Clock };
+    } else if (now >= startTime && now <= endTime && election.is_active) {
+      return { status: 'active', color: 'bg-green-500', text: 'Active', icon: Vote };
+    } else if (election.has_voted) {
+      return { status: 'voted', color: 'bg-blue-500', text: 'Voted', icon: CheckCircle };
+    } else {
+      return { status: 'ended', color: 'bg-gray-500', text: 'Ended', icon: XCircle };
+    }
+  };
+
+  const handleVote = (electionId: string) => {
+    navigate(`/vote/${electionId}`);
+  };
+
+  const handleViewResults = (electionId: string) => {
+    navigate(`/results/${electionId}`);
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6B21E8] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
@@ -168,161 +227,294 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50 pt-16">
       {/* Header */}
-      <header className="bg-card border-b border-border p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <User className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-xl font-bold">Voter Dashboard</h1>
-              <div className="text-sm text-muted-foreground">
-                Welcome back, {userData?.name}
-              </div>
+      <div className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+              <Badge variant="secondary">
+                {organization?.name}
+              </Badge>
+              <Badge variant="outline">
+                {user.role === 'org_owner' ? 'Owner' : user.role}
+              </Badge>
+            </div>
+            <div className="flex items-center space-x-4">
+              {user.role === 'org_owner' || user.role === 'admin' ? (
+                <Button onClick={() => navigate('/admin')}>
+                  Admin Panel
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={() => navigate('/profile')}>
+                Profile
+              </Button>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Active Elections */}
-          <div className="md:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Vote className="h-5 w-5" />
-                  Active Elections
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeElections.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Active Elections</h3>
-                    <p className="text-muted-foreground">
-                      There are no elections currently active. Please check back later.
-                    </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {user.name || user.email}!
+          </h2>
+          <p className="text-gray-600">
+            Here's what's happening in your organization
+          </p>
+        </div>
+
+        {/* Voter Guidance Section */}
+        <Card className="mb-8 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-xl text-green-800">
+              <Target className="h-6 w-6" />
+              How to Vote
+            </CardTitle>
+            <CardDescription>
+              Quick guide to participate in elections
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold text-sm mb-2 text-green-800">Voting Steps:</h4>
+                <div className="space-y-1 text-xs">
+                  <p>• Look for "Active" elections below</p>
+                  <p>• Click "Vote Now" to participate</p>
+                  <p>• Select your preferred candidate</p>
+                  <p>• Submit and save your receipt</p>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold text-sm mb-2 text-blue-800">Status Guide:</h4>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span><strong>Active:</strong> Voting open</span>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {activeElections.map((election) => {
-                      const now = new Date();
-                      const startTime = new Date(election.start_time);
-                      const endTime = new Date(election.end_time);
-                      const isStarted = now >= startTime;
-                      const isEnded = now >= endTime;
-                      const isLive = isStarted && !isEnded;
-
-                      return (
-                        <Card key={election.id} className="overflow-hidden">
-                          <CardContent className="p-6">
-                            <div className="flex justify-between items-start mb-4">
-                              <div>
-                                <h3 className="text-lg font-semibold">{election.name}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                  {isLive ? (
-                                    <span className="text-green-600">Live Now</span>
-                                  ) : !isStarted ? (
-                                    <span className="text-orange-600">Starts {startTime.toLocaleDateString()}</span>
-                                  ) : (
-                                    <span className="text-red-600">Ended {endTime.toLocaleDateString()}</span>
-                                  )}
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() => navigate(`/vote/${election.id}`)}
-                                disabled={!isLive}
-                                className={isLive ? "bg-[#6B21E8] hover:bg-[#6B21E8]/90" : ""}
-                              >
-                                {isLive ? "Vote Now" : "Not Available"}
-                              </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                              {election.candidates.map((candidate) => (
-                                <div key={candidate.id} className="p-3 bg-muted rounded-lg">
-                                  <div className="text-2xl mb-2">{candidate.symbol}</div>
-                                  <div className="font-medium">{candidate.name}</div>
-                                  <div className="text-sm text-muted-foreground">{candidate.party}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <span><strong>Upcoming:</strong> Starting soon</span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* User Info and Recent Activity */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Voter Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">DID</span>
-                    <span className="text-sm font-mono">{userDID.slice(0, 16)}...</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Email</span>
-                    <span className="text-sm">{userData?.email}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span><strong>Voted:</strong> Already participated</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Remember:</strong> You can only vote once per election. Save your receipt for verification.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Elections</CardTitle>
+              <Vote className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalElections}</div>
+              <p className="text-xs text-muted-foreground">
+                All time elections
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Participated</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.participatedElections}</div>
+              <p className="text-xs text-muted-foreground">
+                Elections you voted in
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.upcomingElections}</div>
+              <p className="text-xs text-muted-foreground">
+                Elections starting soon
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Now</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeElections}</div>
+              <p className="text-xs text-muted-foreground">
+                Currently running
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Elections Section */}
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-2xl font-bold text-gray-900">Elections</h3>
+            <div className="flex space-x-2">
+              <Button variant="outline" size="sm">
+                <Calendar className="h-4 w-4 mr-2" />
+                View All
+              </Button>
+            </div>
+          </div>
+
+          {elections.length === 0 ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {voteHistory.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm font-medium mb-1">No Voting History</p>
-                    <p className="text-xs text-muted-foreground">
-                      You haven't voted in any elections yet. When you cast a vote, your voting history and receipts will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {voteHistory.map((vote) => (
-                      <div key={vote.vote_id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium">{vote.election_name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Voted on {new Date(vote.timestamp).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/vote-receipt/${vote.vote_id}`)}
-                          className="hover:bg-[#6B21E8] hover:text-white"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Receipt
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <CardContent className="text-center py-12">
+                <Vote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-gray-900 mb-2">No Elections Available</h4>
+                <p className="text-gray-600 mb-4">
+                  There are no elections available for voting at the moment.
+                </p>
+                <Button variant="outline">
+                  <Clock className="h-4 w-4 mr-2" />
+                  Check Back Later
+                </Button>
               </CardContent>
             </Card>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {elections.map((election) => {
+                const status = getElectionStatus(election);
+                const StatusIcon = status.icon;
+
+                return (
+                  <Card key={election.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{election.name}</CardTitle>
+                        <Badge 
+                          variant={status.status === 'active' ? 'default' : 'secondary'}
+                          className={status.color}
+                        >
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {status.text}
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {election.description || 'No description available'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Start:</span>
+                          <span>{new Date(election.start_time).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">End:</span>
+                          <span>{new Date(election.end_time).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Candidates:</span>
+                          <span>{election.candidates_count}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Total Votes:</span>
+                          <span>{election.total_votes}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        {status.status === 'active' && !election.has_voted && (
+                          <Button 
+                            onClick={() => handleVote(election.id)}
+                            className="flex-1"
+                          >
+                            Vote Now
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        )}
+                        
+                        {status.status === 'voted' && (
+                          <Button 
+                            variant="outline"
+                            onClick={() => handleViewResults(election.id)}
+                            className="flex-1"
+                          >
+                            View Results
+                          </Button>
+                        )}
+                        
+                        {status.status === 'ended' && (
+                          <Button 
+                            variant="outline"
+                            onClick={() => handleViewResults(election.id)}
+                            className="flex-1"
+                          >
+                            View Results
+                          </Button>
+                        )}
+                        
+                        {status.status === 'upcoming' && (
+                          <Button 
+                            variant="outline"
+                            disabled
+                            className="flex-1"
+                          >
+                            Coming Soon
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-12">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>
+                Common tasks and shortcuts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span>View Profile</span>
+                </Button>
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Voting History</span>
+                </Button>
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>Election Calendar</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

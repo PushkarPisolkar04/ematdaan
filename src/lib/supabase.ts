@@ -23,6 +23,27 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Set organization context for multi-tenant queries
+export const setOrganizationContext = async (organizationId: string) => {
+  try {
+    await supabase.rpc('set_organization_context', { org_id: organizationId });
+  } catch (error) {
+    console.error('Failed to set organization context:', error);
+  }
+};
+
+// Get current organization context
+export const getCurrentOrganization = async () => {
+  try {
+    const { data, error } = await supabase.rpc('get_current_organization');
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Failed to get organization context:', error);
+    return null;
+  }
+};
+
 // Helper function to handle API responses
 const handleApiResponse = async <T>(promise: Promise<{ data: T; error: any }>) => {
   try {
@@ -279,6 +300,7 @@ export const electionApi = {
 
   async getActiveElections() {
     try {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('elections')
         .select(`
@@ -294,7 +316,8 @@ export const electionApi = {
             symbol
           )
         `)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .gte('end_time', now);
 
       if (error) {
         console.error('Database error:', error);

@@ -15,10 +15,9 @@ const Layout = ({ children }: LayoutProps) => {
   const shouldShowNavbar = !noNavbarRoutes.includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen w-full bg-background">
       {shouldShowNavbar && <Navbar />}
-      {/* Add padding top only when navbar is shown */}
-      <div className={shouldShowNavbar ? 'pt-16' : ''}>
+      <div className="w-full">
         {children}
       </div>
     </div>
