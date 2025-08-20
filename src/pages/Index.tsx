@@ -10,16 +10,10 @@ import CountdownTimer from "@/components/CountdownTimer";
 import HowItWorks from "@/components/HowItWorks";
 import FAQSection from "@/components/FAQSection";
 import { getElectionStatus, getElectionStats } from "@/lib/api/election";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { electionApi } from '@/lib/supabase';
 import FeatureSection from '@/components/FeatureSection';
 import StatsSection from '@/components/StatsSection';
 import { fetchTodayStats, fetchPlatformStats, PlatformStats } from "@/lib/api/stats";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-// Organization creation is now handled by AuthContext
-import Navbar from "@/components/Navbar";
-import { validateOrganizationForm } from "@/lib/validation";
 
 interface Election {
   id: string;
@@ -44,33 +38,11 @@ const Index = () => {
   const [todayStats, setTodayStats] = useState({ votesToday: 0, usersToday: 0 });
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [showOrgForm, setShowOrgForm] = useState(false);
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
-  const [orgFormData, setOrgFormData] = useState({
-    name: '',
-    ownerName: '',
-    ownerEmail: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [orgFormErrors, setOrgFormErrors] = useState<{[key: string]: string}>({});
 
-  const handleFieldChange = (field: string, value: string) => {
-    setOrgFormData({ ...orgFormData, [field]: value });
-    if (orgFormErrors[field]) {
-      setOrgFormErrors({ ...orgFormErrors, [field]: '' });
-    }
-  };
+
+
 
   useEffect(() => {
-    // Check if we should open the organization creation modal
-    const shouldCreateOrg = searchParams.get('createOrg');
-    if (shouldCreateOrg === 'true') {
-      setShowOrgForm(true);
-      // Clean up the URL
-      navigate('/', { replace: true });
-    }
-
     // Check if we should scroll to a specific section
     const scrollTo = searchParams.get('scrollTo');
     if (scrollTo === 'faqs') {
@@ -129,55 +101,7 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleCreateOrganization = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    setOrgFormErrors({});
-    
-    // Validate form
-    const validation = validateOrganizationForm(orgFormData);
-    if (!validation.isValid) {
-      const errors: {[key: string]: string} = {};
-      validation.errors.forEach(error => {
-        errors[error.field] = error.message;
-      });
-      setOrgFormErrors(errors);
-      
-      // Show first error in toast
-      if (validation.errors.length > 0) {
-        toast({
-          title: "Validation Error",
-          description: validation.errors[0].message,
-          variant: "destructive"
-        });
-      }
-      return;
-    }
 
-    setIsCreatingOrg(true);
-    try {
-      // Simulate organization creation for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Organization Creation",
-        description: "Please use the Create Organization tab in the login page to create your organization"
-      });
-      
-      // Navigate to auth page 
-      navigate('/auth');
-    } catch (error) {
-      console.error('Organization creation error:', error);
-      toast({
-        title: "Creation Failed",
-        description: error instanceof Error ? error.message : 'Failed to create organization',
-        variant: "destructive"
-      });
-    } finally {
-      setIsCreatingOrg(false);
-    }
-  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -251,7 +175,7 @@ const Index = () => {
                     </Button>
 
                     <Button 
-                      onClick={() => setShowOrgForm(true)}
+                      onClick={() => navigate('/auth?tab=create')}
                       variant="outline"
                       className="border-2 border-[#6B21E8] text-[#6B21E8] hover:bg-[#6B21E8] hover:text-white px-8 py-4 text-lg font-semibold transition-all duration-300 transform hover:scale-105 bg-white/80 backdrop-blur-sm"
                     >
@@ -344,8 +268,8 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Features Section */}
-        <FeatureSection />
+                            {/* Features Section */}
+          <FeatureSection />
 
         {/* Live Elections Section */}
         {activeElections.length > 0 && (
@@ -430,124 +354,8 @@ const Index = () => {
         <FAQSection />
       </main>
 
-      {/* Organization Creation Modal */}
-      {showOrgForm && (
-        <div id="create-organization" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Create Your Organization</CardTitle>
-              <CardDescription>
-                Set up your secure voting platform in minutes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateOrganization} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization Name
-                  </label>
-                  <Input
-                    type="text"
-                    value={orgFormData.name}
-                    onChange={(e) => handleFieldChange('name', e.target.value)}
-                    placeholder="Enter organization name"
-                    required
-                    className={orgFormErrors.name ? 'border-red-500' : ''}
-                  />
-                  {orgFormErrors.name && (
-                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.name}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Your Name
-                  </label>
-                  <Input
-                    type="text"
-                    value={orgFormData.ownerName}
-                    onChange={(e) => handleFieldChange('ownerName', e.target.value)}
-                    placeholder="Enter your full name"
-                    required
-                    className={orgFormErrors.ownerName ? 'border-red-500' : ''}
-                  />
-                  {orgFormErrors.ownerName && (
-                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.ownerName}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    value={orgFormData.ownerEmail}
-                    onChange={(e) => handleFieldChange('ownerEmail', e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                    className={orgFormErrors.ownerEmail ? 'border-red-500' : ''}
-                  />
-                  {orgFormErrors.ownerEmail && (
-                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.ownerEmail}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
-                  </label>
-                  <Input
-                    type="password"
-                    value={orgFormData.password}
-                    onChange={(e) => handleFieldChange('password', e.target.value)}
-                    placeholder="Create a password"
-                    required
-                    className={orgFormErrors.password ? 'border-red-500' : ''}
-                  />
-                  {orgFormErrors.password && (
-                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.password}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
-                  </label>
-                  <Input
-                    type="password"
-                    value={orgFormData.confirmPassword}
-                    onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
-                    placeholder="Confirm your password"
-                    required
-                    className={orgFormErrors.confirmPassword ? 'border-red-500' : ''}
-                  />
-                  {orgFormErrors.confirmPassword && (
-                    <p className="text-red-500 text-sm mt-1">{orgFormErrors.confirmPassword}</p>
-                  )}
-                </div>
-                
-                <div className="flex gap-3">
-                  <Button 
-                    type="submit" 
-                    className="flex-1" 
-                    disabled={isCreatingOrg}
-                  >
-                    {isCreatingOrg ? 'Creating...' : 'Create Organization'}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setShowOrgForm(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
+
     </div>
   );
 };

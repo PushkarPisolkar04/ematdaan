@@ -15,6 +15,7 @@ import Results from '@/pages/Results';
 import Profile from '@/pages/Profile';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
+import ElectionsList from '@/pages/ElectionsList';
 import NotFound from '@/pages/NotFound';
 
 function App() {
@@ -75,6 +76,12 @@ function App() {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/elections" element={
+              <ProtectedRoute>
+                <ElectionsList />
               </ProtectedRoute>
             } />
             

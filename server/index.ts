@@ -3,8 +3,10 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import organizationsRouter from './api/organizations.js';
 
-dotenv.config();
+// Load environment variables from the project root
+dotenv.config({ path: '.env' });
 
 const app = express();
 
@@ -180,6 +182,9 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
     });
   }
 });
+
+// Organizations routes
+app.use('/api/organizations', organizationsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

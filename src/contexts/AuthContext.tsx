@@ -41,7 +41,8 @@ interface AuthContextType {
     ownerName: string;
     ownerEmail: string;
     ownerPassword: string;
-  }) => Promise<void>;
+  }) => Promise<{ success: boolean; requiresOTP: boolean }>;
+  verifyOrganizationOTP: (email: string, otp: string) => Promise<{ success: boolean }>;
   joinOrganization: (token: string, data: {
     name: string;
     email: string;
@@ -167,9 +168,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User not found. Please check your email or register.');
       }
 
-      // Verify password (in a real app, you'd use bcrypt)
-      // For now, we'll assume password verification is handled by the backend
-      if (userData.password_hash !== password) { // This is simplified - should use bcrypt
+      // Verify password (hash the input password and compare)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const inputPasswordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      if (userData.password_hash !== inputPasswordHash) {
         throw new Error('Invalid password');
       }
 
@@ -286,94 +292,99 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Generate slug
-      const slug = data.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-
-      // Check if organization exists
-      const { data: existingOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('slug', slug)
-        .single();
-
-      if (existingOrg) {
-        throw new Error('Organization already exists with this name');
-      }
-
-      // Check if owner email exists
-      const { data: existingUser } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', data.ownerEmail)
-        .single();
-
-      if (existingUser) {
-        throw new Error('User already exists with this email');
-      }
-
-      // Create organization
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: data.name,
-          slug,
-          admin_email: data.ownerEmail,
-          admin_password_hash: data.ownerPassword, // Should be hashed in production
-          is_active: true
-        })
-        .select()
-        .single();
-
-      if (orgError) {
-        throw new Error('Failed to create organization');
-      }
-
-      // Create admin user
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .insert({
+      // Send OTP via backend API
+      const response = await fetch('http://localhost:5000/api/organizations/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: data.ownerEmail,
-          password_hash: data.ownerPassword, // Should be hashed in production
-          name: data.ownerName,
-          role: 'admin',
-          is_verified: false
+          name: data.name,
+          ownerName: data.ownerName,
+          ownerPassword: data.ownerPassword
         })
-        .select()
-        .single();
+      });
 
-      if (userError) {
-        throw new Error('Failed to create admin user');
-      }
-
-      // Create user-organization relationship
-      const { error: userOrgError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: userData.id,
-          organization_id: orgData.id,
-          role: 'admin',
-          joined_via: 'admin_creation',
-          is_active: true
-        });
-
-      if (userOrgError) {
-        throw new Error('Failed to associate user with organization');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send OTP');
       }
 
       toast({
-        title: "Organization Created",
-        description: "Your organization has been created successfully"
+        title: "OTP Sent",
+        description: `Verification code sent to ${data.ownerEmail}. Please check your email.`
       });
+
+      // Return success but don't create organization yet
+      return { success: true, requiresOTP: true };
 
     } catch (error) {
       console.error('Organization creation failed:', error);
       toast({
         title: "Creation Failed",
         description: error instanceof Error ? error.message : 'An error occurred during organization creation',
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOrganizationOTP = async (email: string, otp: string) => {
+    try {
+      setIsLoading(true);
+
+      // Verify OTP and create organization via backend API
+      const response = await fetch('http://localhost:5000/api/organizations/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          otp: otp
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to verify OTP');
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Store session token
+        localStorage.setItem('session_token', result.data.sessionToken);
+
+        // Update state to log the user in
+        setUser(result.data.user);
+        setOrganization(result.data.organization);
+        setUserRole('admin');
+        setIsAuthenticated(true);
+
+        // Store in localStorage
+        localStorage.setItem('user_data', JSON.stringify(result.data.user));
+        localStorage.setItem('organization_data', JSON.stringify(result.data.organization));
+        localStorage.setItem('user_role', 'admin');
+
+        toast({
+          title: "Organization Created",
+          description: "Your organization has been created successfully and you are now logged in!"
+        });
+
+        return { success: true };
+      } else {
+        throw new Error(result.message || 'Failed to create organization');
+      }
+
+    } catch (error) {
+      console.error('OTP verification failed:', error);
+      toast({
+        title: "Verification Failed",
+        description: error instanceof Error ? error.message : 'Failed to verify OTP',
         variant: "destructive"
       });
       throw error;
@@ -412,12 +423,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User already exists with this email');
       }
 
+      // Hash user password
+      const encoder = new TextEncoder();
+      const userPasswordData = encoder.encode(data.password);
+      const userPasswordHashBuffer = await crypto.subtle.digest('SHA-256', userPasswordData);
+      const userPasswordHashArray = Array.from(new Uint8Array(userPasswordHashBuffer));
+      const userPasswordHash = userPasswordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
       // Create user
       const { data: userData, error: userError } = await supabase
         .from('auth_users')
         .insert({
           email: data.email,
-          password_hash: data.password, // Should be hashed in production
+          password_hash: userPasswordHash,
           name: data.name,
           role: tokenInfo.role,
           is_verified: false
@@ -586,6 +604,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     createOrganization,
+    verifyOrganizationOTP,
     joinOrganization,
     sendOTP,
     verifyOTP,

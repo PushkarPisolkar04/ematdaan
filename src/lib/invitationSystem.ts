@@ -226,14 +226,26 @@ export const registerWithInvitation = async (
         email: userData.email.toLowerCase(),
         password_hash: passwordHash,
         name: userData.name,
-        organization_id: validation.organization_id,
-        role: 'voter',
+        role: 'student',
         is_verified: true // Auto-verified since they have invitation
       })
       .select()
       .single();
     
     if (userError) throw userError;
+    
+    // Create user-organization relationship
+    const { error: userOrgError } = await supabase
+      .from('user_organizations')
+      .insert({
+        user_id: user.id,
+        organization_id: validation.organization_id,
+        role: 'student',
+        joined_via: 'invitation',
+        is_active: true
+      });
+    
+    if (userOrgError) throw userOrgError;
     
     // Mark invitation as used
     const { error: markError } = await supabase.rpc('mark_invitation_used', {

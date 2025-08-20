@@ -39,7 +39,7 @@ export default function Navbar() {
   };
 
   const handleCreateOrg = () => {
-    navigate('/?createOrg=true');
+    navigate('/auth?tab=create');
   };
 
   const handleFAQClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -92,8 +92,7 @@ export default function Navbar() {
   const navItems = [
     { label: "Home", href: "/", onClick: handleHomeClick },
     { label: "Vote", href: "/auth" },
-    { label: "Results", href: "/results" },
-    { label: "Verify Vote", href: "/verify-vote" },
+    { label: "Elections", href: "/elections" },
     { label: "FAQs", href: "#faqs", onClick: handleFAQClick },
   ];
 

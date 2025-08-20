@@ -12,9 +12,12 @@ const Login = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('login');
   const [isLoading, setIsLoading] = useState(false);
+  const [showOTPForm, setShowOTPForm] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { login, createOrganization, joinOrganization } = useAuth();
+  const { login, createOrganization, verifyOrganizationOTP, joinOrganization } = useAuth();
 
   // Form data
   const [invitationToken, setInvitationToken] = useState('');
@@ -36,12 +39,16 @@ const Login = () => {
     confirmPassword: ''
   });
 
-  // Check for invitation token in URL
+  // Check for invitation token or tab in URL
   useEffect(() => {
     const token = searchParams.get('invitation');
+    const tab = searchParams.get('tab');
+    
     if (token) {
       setInvitationToken(token);
       setActiveTab('join');
+    } else if (tab) {
+      setActiveTab(tab);
     }
   }, [searchParams]);
 
@@ -91,20 +98,87 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      await createOrganization({
+      const result = await createOrganization({
         name: orgData.name,
         ownerName: orgData.ownerName,
         ownerEmail: orgData.ownerEmail,
         ownerPassword: orgData.password
       });
+      
+      if (result.requiresOTP) {
+        // Show OTP form
+        setShowOTPForm(true);
+        setPendingEmail(orgData.ownerEmail);
+        toast({
+          title: "OTP Sent",
+          description: "Please check your email for the verification code",
+        });
+      } else {
+        // Organization created without OTP
+        toast({
+          title: "Organization Created",
+          description: "Your organization has been created successfully. You can now log in."
+        });
+        setActiveTab('login');
+        setLoginData({ email: orgData.ownerEmail, password: '' });
+      }
+    } catch (error) {
+      console.error('Organization creation failed:', error);
+      toast({
+        title: "Creation Failed",
+        description: error instanceof Error ? error.message : 'Failed to create organization',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!otpValue.trim()) {
+      toast({
+        title: "OTP Required",
+        description: "Please enter the verification code",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await verifyOrganizationOTP(pendingEmail, otpValue);
+      
+      // Close the OTP form
+      setShowOTPForm(false);
+      setOtpValue('');
+      setPendingEmail('');
+      
+      // Reset form data
+      setOrgData({
+        name: '',
+        ownerName: '',
+        ownerEmail: '',
+        password: '',
+        confirmPassword: ''
+      });
+      
       toast({
         title: "Organization Created",
-        description: "Your organization has been created successfully. You can now log in."
+        description: "Your organization has been created successfully! You can now log in."
       });
+      
+      // Switch to login tab with email pre-filled
       setActiveTab('login');
       setLoginData({ email: orgData.ownerEmail, password: '' });
     } catch (error) {
-      console.error('Organization creation failed:', error);
+      console.error('OTP verification error:', error);
+      toast({
+        title: "Verification Failed",
+        description: error instanceof Error ? error.message : 'Failed to verify OTP',
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -344,6 +418,52 @@ const Login = () => {
                         {isLoading ? 'Creating organization...' : 'Create Organization'}
                       </Button>
                     </form>
+
+                    {/* OTP Verification Form */}
+                    {showOTPForm && (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3">Verify Your Email</h3>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Enter the 6-digit code sent to <strong>{pendingEmail}</strong>
+                        </p>
+                        <form onSubmit={handleVerifyOTP} className="space-y-3">
+                          <div className="space-y-1">
+                            <label htmlFor="otp-code" className="text-sm font-semibold text-gray-700">Verification Code</label>
+                            <Input
+                              id="otp-code"
+                              type="text"
+                              placeholder="Enter 6-digit code"
+                              value={otpValue}
+                              onChange={(e) => setOtpValue(e.target.value)}
+                              maxLength={6}
+                              className="h-9 text-sm text-center tracking-widest"
+                              required
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              type="submit" 
+                              className="flex-1 h-9 text-sm font-semibold bg-[#6B21E8] hover:bg-[#6B21E8]/90" 
+                              disabled={isLoading}
+                            >
+                              {isLoading ? 'Verifying...' : 'Verify & Create'}
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant="outline"
+                              className="h-9 text-sm"
+                              onClick={() => {
+                                setShowOTPForm(false);
+                                setOtpValue('');
+                                setPendingEmail('');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </CardContent>

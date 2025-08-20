@@ -181,7 +181,7 @@ MIT License - see [LICENSE](LICENSE) file.
 <div align="center">
   <p>Made with ❤️ for secure digital democracy</p>
   <p>
-    <a href="https://github.com/yourusername/ematdaan">GitHub</a> •
+    <a href="https://github.com/PushkarPisolkar04/ematdaan">GitHub</a> •
     <a href="https://ematdaan.vercel.app">Live Demo</a>
   </p>
 </div>

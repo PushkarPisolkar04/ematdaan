@@ -187,12 +187,18 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
 
-      // In a real app, you'd verify the current password first
-      // For now, we'll just update with the new password (simplified)
+      // Hash the new password
+      const encoder = new TextEncoder();
+      const newPasswordData = encoder.encode(passwordData.newPassword);
+      const passwordHashBuffer = await crypto.subtle.digest('SHA-256', newPasswordData);
+      const passwordHashArray = Array.from(new Uint8Array(passwordHashBuffer));
+      const passwordHash = passwordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Update the password hash
       const { error } = await supabase
         .from('auth_users')
         .update({
-          password_hash: passwordData.newPassword // In production, this should be properly hashed
+          password_hash: passwordHash
         })
         .eq('id', user.id);
 
