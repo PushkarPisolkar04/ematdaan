@@ -132,7 +132,7 @@ const Candidates: React.FC = () => {
 
     // Quick server health check
     try {
-      const healthResponse = await fetch('http://localhost:5000/api/health', { 
+      const healthResponse = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/health`, { 
         method: 'GET',
         signal: AbortSignal.timeout(3000) // 3 second timeout
       });

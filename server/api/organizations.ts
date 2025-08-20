@@ -209,7 +209,7 @@ router.post('/send-otp', async (req, res) => {
     }
 
     // Send OTP via email (using your existing email service)
-    const emailResponse = await fetch(`${process.env.BASE_URL || 'http://localhost:3000'}/api/send-otp`, {
+          const emailResponse = await fetch(`${process.env.VITE_APP_URL || 'http://localhost:3000'}/api/send-otp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

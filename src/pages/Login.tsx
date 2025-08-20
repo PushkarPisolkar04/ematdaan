@@ -110,7 +110,7 @@ const Login = () => {
     }
 
     try {
-    setIsLoading(true);
+      setIsLoading(true);
       await login(loginData.email, loginData.password);
       // Redirect based on user role
       if (userRole === 'admin') {
@@ -119,6 +119,7 @@ const Login = () => {
         navigate('/dashboard');
       }
     } catch (error) {
+      // Error is already handled in the login function with toast notification
       console.error('Login failed:', error);
     } finally {
       setIsLoading(false);

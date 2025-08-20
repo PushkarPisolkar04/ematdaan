@@ -315,7 +315,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
 
       // Send OTP via backend API
-      const response = await fetch('http://localhost:5000/api/organizations/send-otp', {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/organizations/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -374,7 +374,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const orgData = JSON.parse(pendingOrgData);
 
       // Verify OTP and create organization via backend API
-      const response = await fetch('http://localhost:5000/api/organizations/verify-otp', {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/organizations/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -479,7 +479,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const otp = generateSecureOTP();
       
       // Send OTP via email using server endpoint
-      const response = await fetch('http://localhost:5000/api/send-otp', {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

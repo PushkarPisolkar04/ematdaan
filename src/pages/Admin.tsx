@@ -207,7 +207,10 @@ const Admin = () => {
   const loadStats = async (currentUsers: User[], currentElections: Election[]) => {
     try {
       setStatsLoading(true);
-      const totalUsers = currentUsers.length;
+      
+      // Count only students (eligible voters), excluding admins
+      const eligibleVoters = currentUsers.filter(user => user.role === 'student').length;
+      const totalUsers = currentUsers.length; // Keep total users for other purposes
       
       // Calculate active elections based on both is_active flag and time constraints
       const now = new Date();
@@ -227,7 +230,7 @@ const Admin = () => {
       const pendingInvitations = invitationStats?.[0]?.pending_invitations || 0;
 
       setStats({
-        totalUsers,
+        totalUsers: eligibleVoters, // Use eligible voters count instead of total users
         activeElections,
         totalVotes,
         pendingInvitations: pendingInvitations || 0
@@ -781,8 +784,10 @@ const Admin = () => {
                 <CardContent className="pt-0">
                   <div className="space-y-4">
                     {elections.slice(0, 5).map((election) => {
-                      const participationRate = stats.totalUsers > 0 ? 
-                        ((election.total_votes || 0) / stats.totalUsers) * 100 : 0;
+                      // Calculate participation rate based on eligible voters only
+                      const eligibleVoters = users.filter(user => user.role === 'student').length;
+                      const participationRate = eligibleVoters > 0 ? 
+                        ((election.total_votes || 0) / eligibleVoters) * 100 : 0;
                       return (
                         <div key={election.id} className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
@@ -818,13 +823,18 @@ const Admin = () => {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Active Users</span>
-                      <span className="font-medium">{users.filter(u => u.is_active).length}</span>
+                      <span className="text-sm text-gray-600">Active Students</span>
+                      <span className="font-medium">{users.filter(u => u.is_active && u.role === 'student').length}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Success Rate</span>
+                      <span className="text-sm text-gray-600">Average Participation</span>
                       <span className="font-medium">
-                        {elections.length > 0 ? Math.round((elections.filter(e => getElectionStatus(e).status === 'ended').length / elections.length) * 100) : 0}%
+                        {elections.length > 0 ? 
+                          Math.round(elections.reduce((sum, e) => {
+                            const eligibleVoters = users.filter(user => user.role === 'student').length;
+                            const participationRate = eligibleVoters > 0 ? ((e.total_votes || 0) / eligibleVoters) * 100 : 0;
+                            return sum + participationRate;
+                          }, 0) / elections.length) : 0}%
                       </span>
                     </div>
                   </div>

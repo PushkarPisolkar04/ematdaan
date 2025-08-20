@@ -19,7 +19,7 @@ const app = express();
 // Security middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-domain.com'] // Replace with your actual domain
+    ? ['https://ematdaan.vercel.app'] // Your Vercel domain
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
   credentials: true
 }));
