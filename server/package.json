@@ -15,14 +15,14 @@
     "nodemailer": "^6.9.7",
     "dotenv": "^16.3.1",
     "express-rate-limit": "^7.1.5",
-    "@supabase/supabase-js": "^2.39.3"
-  },
-  "devDependencies": {
+    "@supabase/supabase-js": "^2.39.3",
     "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
     "@types/nodemailer": "^6.4.14",
     "@types/node": "^20.10.5",
-    "tsx": "^4.6.2",
     "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.6.2"
   }
 } 
