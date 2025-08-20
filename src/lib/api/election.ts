@@ -1,11 +1,10 @@
 import { supabase } from '@/lib/supabase';
-import { generateKey } from '@/lib/encryption';
-import type { Election, Candidate } from '@/types';
+import { generateElectionKeys } from '@/lib/advancedSecurity';
 
 export const createElection = async (name: string, startTime: Date, endTime: Date) => {
   try {
-    // Generate encryption keys
-    const keys = await generateKey();
+    // Generate encryption keys for the election
+    const keys = await generateElectionKeys();
 
     // Create election in database
     const { data: election, error } = await supabase
@@ -18,15 +17,14 @@ export const createElection = async (name: string, startTime: Date, endTime: Dat
         total_votes: 0,
         encryption_keys: {
           publicKey: {
-            n: keys.publicKey.n.toString(),
-            g: keys.publicKey.g.toString(),
+            n: keys.publicKey.n,
+            e: keys.publicKey.e,
           },
           privateKey: {
-            lambda: keys.privateKey.lambda.toString(),
-            mu: keys.privateKey.mu.toString(),
-            n: keys.privateKey.n.toString(),
+            n: keys.privateKey.n,
+            d: keys.privateKey.d,
           },
-        },
+        }
       })
       .select()
       .single();

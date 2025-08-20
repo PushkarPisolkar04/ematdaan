@@ -17,8 +17,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showAccessCodeModal, setShowAccessCodeModal] = useState(false);
-  const [accessCode, setAccessCode] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -38,27 +36,6 @@ export default function Navbar() {
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
-
-  const handleAccessCodeSubmit = () => {
-    if (!accessCode.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an access code",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Navigate to auth page with access code
-    navigate('/auth', { 
-      state: { 
-        accessCode: accessCode,
-        mode: 'access_code'
-      }
-    });
-    setShowAccessCodeModal(false);
-    setAccessCode('');
   };
 
   const handleCreateOrg = () => {
@@ -179,13 +156,7 @@ export default function Navbar() {
                 </DropdownMenu>
               ) : (
                 <>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowAccessCodeModal(true)}
-                    className="border-gray-300 hover:border-[#6B21E8] hover:bg-[#6B21E8]/5"
-                  >
-                    Enter Access Code
-                  </Button>
+
                   <Button 
                     onClick={handleLogin}
                     className="bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white px-6 py-2 font-medium shadow-lg hover:shadow-xl transition-all duration-200"
@@ -211,7 +182,7 @@ export default function Navbar() {
                     <Menu className="h-6 w-6" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-80">
+                <SheetContent side="right" className="w-80" title="Menu">
                   <div className="flex flex-col h-full">
                     {/* Mobile Logo */}
                     <div className="flex items-center space-x-3 mb-8">
@@ -293,16 +264,7 @@ export default function Navbar() {
                         </>
                       ) : (
                         <>
-                          <Button 
-                            variant="outline" 
-                            className="w-full"
-                            onClick={() => {
-                              setShowAccessCodeModal(true);
-                              setIsMenuOpen(false);
-                            }}
-                          >
-                            Enter Access Code
-                          </Button>
+
                           <Button 
                             className="w-full bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
                             onClick={() => {
@@ -333,42 +295,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Access Code Modal */}
-      {showAccessCodeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Enter Access Code</CardTitle>
-              <CardDescription>
-                Enter your organization's access code to join
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Enter access code"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAccessCodeSubmit()}
-              />
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => setShowAccessCodeModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  className="flex-1 bg-[#6B21E8] hover:bg-[#6B21E8]/90"
-                  onClick={handleAccessCodeSubmit}
-                >
-                  Continue
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
     </>
   );
 }

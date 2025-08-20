@@ -88,7 +88,9 @@ const sendInvitationEmails = async (invitations: any[]) => {
 
 // Generate invitation link
 export const generateInvitationLink = (token: string): string => {
-  return `${window.location.origin}/register?invitation=${token}`;
+  // Use environment variable for production URL, fallback to current origin for development
+  const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+  return `${baseUrl}/auth?invitation=${token}`;
 };
 
 // Send invitation email
@@ -115,13 +117,31 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
     </div>
   `;
 
-  // Use existing email service
-  const { sendEmail } = await import('./emailService');
-  return sendEmail({
-    to: email,
-    subject: 'You are invited to vote in the election',
-    html
-  });
+  // Send email using the server endpoint
+  try {
+    const response = await fetch('http://localhost:5000/send-invitation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: 'You are invited to vote in the election',
+        html
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send email');
+    }
+
+    return { success: true };
+  } catch (error) {
+    // Log error securely without exposing sensitive data
+    console.error('Failed to send invitation email - Network or server error');
+    // Don't fail the invitation creation if email fails
+    return { success: true, warning: 'Invitation created but email could not be sent' };
+  }
 };
 
 // Validate invitation token

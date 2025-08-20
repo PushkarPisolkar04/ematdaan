@@ -67,15 +67,8 @@ const ForgotPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
-          <p className="text-gray-600">
-            Enter your email address and we'll send you a link to reset your password
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 pt-20">
+      <div className="w-full max-w-md mx-auto">
 
         <Card className="shadow-lg">
           <CardHeader className="text-center">
@@ -171,17 +164,7 @@ const ForgotPassword: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Help Text */}
-        <div className="mt-8 text-center">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <h3 className="font-medium text-gray-900 mb-2">Need Help?</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p>• Make sure to check your spam or junk folder</p>
-              <p>• Reset links expire after 24 hours</p>
-              <p>• Contact your organization admin if you continue having issues</p>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   );

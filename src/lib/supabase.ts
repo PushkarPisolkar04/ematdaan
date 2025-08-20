@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/supabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -9,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -155,6 +154,11 @@ export const electionApi = {
 
   async getActiveElections(organizationId: string) {
     try {
+      // If organizationId is empty, return empty array
+      if (!organizationId || organizationId.trim() === '') {
+        return [];
+      }
+
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('elections')

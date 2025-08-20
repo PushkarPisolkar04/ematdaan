@@ -16,9 +16,11 @@ import {
   BarChart3,
   Mail,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from 'lucide-react';
 import { supabase, electionApi, candidateApi } from '@/lib/supabase';
+import { generateAuditReport } from '@/lib/receipt';
 
 interface Election {
   id: string;
@@ -152,14 +154,17 @@ const Admin = () => {
 
       if (error) throw error;
 
-      const processedUsers = (data || []).map(userOrg => ({
-        id: userOrg.auth_users?.id || '',
-        name: userOrg.auth_users?.name || '',
-        email: userOrg.auth_users?.email || '',
-        role: userOrg.auth_users?.role || '',
-        joined_at: userOrg.joined_at,
-        is_active: userOrg.is_active
-      })).filter(user => user.id) as User[];
+      const processedUsers = (data || []).map(userOrg => {
+        const authUser = Array.isArray(userOrg.auth_users) ? userOrg.auth_users[0] : userOrg.auth_users;
+        return {
+          id: authUser?.id || '',
+          name: authUser?.name || '',
+          email: authUser?.email || '',
+          role: authUser?.role || '',
+          joined_at: userOrg.joined_at,
+          is_active: userOrg.is_active
+        };
+      }).filter(user => user.id) as User[];
 
       setUsers(processedUsers);
     } catch (error) {
@@ -294,6 +299,117 @@ const Admin = () => {
       });
     }
   };
+
+  const handleGenerateAuditReport = async (electionId: string) => {
+    try {
+      // Get election details
+      const { data: election, error: electionError } = await supabase
+        .from('elections')
+        .select('*')
+        .eq('id', electionId)
+        .single();
+
+      if (electionError || !election) {
+        throw new Error('Election not found');
+      }
+
+      // Get audit logs
+      const { data: auditLogs, error: auditError } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('organization_id', organization?.id)
+        .gte('created_at', election.start_time)
+        .lte('created_at', election.end_time)
+        .order('created_at', { ascending: true });
+
+      if (auditError) {
+        console.warn('Failed to fetch audit logs:', auditError);
+      }
+
+      // Get vote logs
+      const { data: voteLogs, error: voteError } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('election_id', electionId)
+        .order('created_at', { ascending: true });
+
+      if (voteError) {
+        console.warn('Failed to fetch vote logs:', voteError);
+      }
+
+      // Get user statistics
+      const { count: totalRegistered } = await supabase
+        .from('user_organizations')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization?.id)
+        .eq('is_active', true);
+
+      const totalVoted = voteLogs?.length || 0;
+      const totalAbstained = (totalRegistered || 0) - totalVoted;
+
+      // Get security metrics
+      const { count: totalSessions } = await supabase
+        .from('user_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization?.id)
+        .gte('created_at', election.start_time)
+        .lte('created_at', election.end_time);
+
+      const { count: totalOTPs } = await supabase
+        .from('otps')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', election.start_time)
+        .lte('created_at', election.end_time);
+
+      const { count: totalMFA } = await supabase
+        .from('mfa_tokens')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', election.start_time)
+        .lte('created_at', election.end_time);
+
+      // Generate audit report
+      await generateAuditReport({
+        election: {
+          id: election.id,
+          name: election.name,
+          start_time: election.start_time,
+          end_time: election.end_time
+        },
+        organization: {
+          id: organization?.id || '',
+          name: organization?.name || ''
+        },
+        auditLogs: auditLogs || [],
+        voteLogs: voteLogs || [],
+        userStats: {
+          totalRegistered: totalRegistered || 0,
+          totalVoted,
+          totalAbstained
+        },
+        securityMetrics: {
+          totalSessions: totalSessions || 0,
+          totalOTPs: totalOTPs || 0,
+          totalMFA: totalMFA || 0,
+          suspiciousActivities: 0 // This would be calculated based on your security rules
+        }
+      });
+
+      toast({
+        title: "Audit Report Generated",
+        description: "Election audit report has been downloaded"
+      });
+
+    } catch (error) {
+      console.error('Failed to generate audit report:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate audit report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+
 
   if (isLoading) {
     return (
@@ -521,6 +637,14 @@ const Admin = () => {
                           onClick={() => navigate(`/admin/elections/${election.id}/candidates`)}
                         >
                           Manage Candidates
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateAuditReport(election.id)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Audit Report
                         </Button>
                         <Button
                           variant="destructive"

@@ -1,80 +1,118 @@
-# E-Matdaan SaaS - Secure Digital Voting Platform
+<div align="center">
+  <img src="https://img.shields.io/badge/E--Matdaan-Digital%20Voting%20Platform-6B21E8?style=for-the-badge&logo=vote&logoColor=white" alt="E-Matdaan Logo" />
+  <h1>🗳️ E-Matdaan</h1>
+  <p><strong>Secure Digital Voting Platform for Organizations</strong></p>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.2.2-blue.svg)](https://www.typescriptlang.org/)
+  [![Supabase](https://img.shields.io/badge/Supabase-Latest-green.svg)](https://supabase.com/)
+  [![Vite](https://img.shields.io/badge/Vite-5.4.19-purple.svg)](https://vitejs.dev/)
+  [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4.1-38B2AC.svg)](https://tailwindcss.com/)
+  
+  <p align="center">
+    <em>A comprehensive, secure, and scalable digital voting platform built with modern web technologies.</em>
+  </p>
+</div>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Latest-green.svg)](https://supabase.com/)
+---
 
-> **Secure, Scalable Digital Voting Platform for Organizations Worldwide**
+## 🚀 Quick Start
 
-E-Matdaan SaaS is a comprehensive multi-tenant digital voting platform designed for schools, colleges, corporations, and government institutions. Built with modern web technologies and enterprise-grade security, it provides a complete solution for conducting secure, transparent, and verifiable elections.
+### **Live Demo**
+**[View Live Demo](https://ematdaan.vercel.app)** | **[Documentation](https://ematdaan.vercel.app/docs)**
 
-## 🚀 Live Demo
+### **Local Development**
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ematdaan.git
+cd ematdaan
 
-**[View Live Demo](https://ematdaan.vercel.app)** | **[SaaS Landing Page](https://ematdaan.vercel.app/saas)**
+# Install dependencies
+npm install
+
+# Start development servers (frontend + backend)
+npm run dev:all
+
+# Or start individually
+npm run dev      # Frontend (http://localhost:3000)
+npm run server   # Backend (http://localhost:5000)
+```
+
+---
 
 ## ✨ Key Features
 
-### 🔐 **Multi-Authentication Options**
-- **Traditional Email/Password** - No MetaMask required
-- **MetaMask Integration** - For advanced users (optional)
-- **Email OTP Verification** - Secure two-factor authentication
-- **Session Management** - Secure session handling
-
-### 🏢 **Multi-Tenant Architecture**
-- **Organization Isolation** - Complete data separation
-- **Custom Domains** - Each organization gets their own subdomain
-- **Scalable Pricing** - Free, Pro, and Enterprise tiers
-- **Admin Management** - Role-based access control
-
-### 🗳️ **Voting Features**
-- **End-to-End Encryption** - Votes encrypted before transmission
+### 🔐 **Advanced Security**
+- **End-to-End Encryption** - AES-256 vote encryption
+- **Zero-Knowledge Proofs** - Vote privacy without revealing choices
 - **Merkle Tree Verification** - Transparent vote verification
-- **Real-Time Results** - Live election updates
-- **Audit Logging** - Complete audit trail
-- **Vote Receipts** - Cryptographic proof of voting
+- **Digital Signatures** - ECDSA signature verification
+- **Row Level Security** - Database-level access control
 
-### 🛡️ **Security & Compliance**
-- **Row Level Security (RLS)** - Database-level data protection
-- **Multi-Factor Authentication** - Enhanced security
-- **Account Locking** - Protection against brute force attacks
-- **Session Management** - Secure session handling
-- **Audit Trails** - Complete activity logging
+### 🏢 **Organization Management**
+- **Multi-Tenant Architecture** - Complete organization isolation
+- **Invitation System** - Secure member invitations via email
+- **Role-Based Access** - Admin and Student roles
+- **Session Management** - Secure session handling with expiration
 
-## 🛠️ Tech Stack
+### 🗳️ **Voting System**
+- **Real-Time Elections** - Live election updates
+- **Vote Receipts** - Cryptographic proof with QR codes
+- **Vote Verification** - Verify your vote was counted correctly
+- **Audit Logging** - Complete activity trail
+- **PDF Reports** - Election results and audit reports
 
-### **Frontend**
+### 📧 **Email Integration**
+- **OTP Verification** - Secure two-factor authentication
+- **Invitation Emails** - Automated member invitations
+- **Password Recovery** - Secure password reset flow
+- **SMTP Integration** - Gmail/Outlook support
+
+---
+
+## 🛠️ Technology Stack
+
+### **Frontend (Port 3000)**
 - **React 18.2.0** - Modern UI framework
-- **TypeScript 5.0** - Type-safe development
-- **TailwindCSS 3.3** - Utility-first CSS framework
-- **Vite 4.4** - Fast build tool
-- **React Router 6.8** - Client-side routing
+- **TypeScript 5.2.2** - Type-safe development
+- **Vite 5.4.19** - Fast build tool and dev server
+- **TailwindCSS 3.4.1** - Utility-first CSS framework
+- **Framer Motion** - Smooth animations
+- **Radix UI** - Accessible components
+- **React Router 6.22.2** - Client-side routing
 
-### **Backend & Database**
-- **Supabase** - Open-source Firebase alternative
+### **Backend (Port 5000)**
+- **Node.js** - JavaScript runtime
+- **Express.js 4.21.2** - Web framework
+- **TypeScript** - Type-safe backend
+- **Nodemailer 6.9.12** - Email service
+- **Rate Limiting** - API protection
+- **Security Headers** - Enhanced security
+
+### **Database & Infrastructure**
+- **Supabase** - Backend-as-a-Service
 - **PostgreSQL** - Reliable relational database
 - **Row Level Security (RLS)** - Database security
 - **Real-time Subscriptions** - Live updates
+- **Edge Functions** - Serverless functions
 
-### **Authentication & Security**
-- **Custom Session Management** - Traditional auth
-- **MetaMask Integration** - Web3 authentication
+### **Security & Authentication**
+- **Custom Session Management** - Traditional auth system
 - **Email OTP System** - Two-factor authentication
 - **Password Hashing** - Secure credential storage
+- **JWT Tokens** - Secure session tokens
+- **CORS Protection** - Cross-origin security
 
-### **Deployment & Infrastructure**
-- **Vercel** - Frontend hosting
-- **Supabase Cloud** - Backend services
-- **GitHub** - Version control
-- **Environment Variables** - Secure configuration
+---
 
 ## 📦 Installation & Setup
 
 ### **Prerequisites**
-- Node.js 18+ 
-- npm or yarn
-- Supabase account
-- Email service (for OTP)
+- **Node.js 18+** - JavaScript runtime
+- **npm or yarn** - Package manager
+- **Supabase account** - Database service
+- **Email service** - For OTP and invitations
 
 ### **1. Clone Repository**
 ```bash
@@ -87,201 +125,199 @@ cd ematdaan
 npm install
 ```
 
-### **3. Environment Setup**
-```bash
-# Copy environment template
-cp .env.example .env
+### **3. Environment Configuration**
+Create a `.env` file in the root directory:
 
-# Configure your environment variables
+```env
+# Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_SAAS_MODE=true
-VITE_DEFAULT_ORG_SLUG=default
+
+# Server Configuration
+SERVER_PORT=5000
+NODE_ENV=development
+
+# Email Configuration (Gmail/Outlook)
+VITE_SMTP_HOST=smtp.gmail.com
+VITE_SMTP_PORT=587
+VITE_SMTP_USER=your_email@gmail.com
+VITE_SMTP_PASS=your_app_password
+VITE_SMTP_FROM=your_email@gmail.com
+
+# App Configuration
+VITE_APP_URL=http://localhost:3000
 ```
 
 ### **4. Database Setup**
+1. **Create Supabase Project** - [supabase.com](https://supabase.com)
+2. **Run Migration** - Copy and run the SQL from `supabase/migrations/20250101000000_complete_system_reset.sql`
+3. **Configure RLS** - Row Level Security is automatically enabled
+
+### **5. Start Development**
 ```bash
-# Apply database migrations
-npx supabase db push
-
-# Or manually run SQL in Supabase dashboard
-```
-
-### **5. Development Server**
-```bash
-# Start development server
-npm run dev
-
-# For concurrent development (with proxy server)
+# Start both frontend and backend
 npm run dev:all
+
+# Or start individually
+npm run dev      # Frontend: http://localhost:3000
+npm run server   # Backend: http://localhost:5000
 ```
 
-## 🏗️ SaaS Architecture
+---
 
-### **Multi-Tenant Structure**
+## 🗄️ Database Schema
+
+### **Core Tables (15 total)**
+- **organizations** - Organization management
+- **auth_users** - User authentication
+- **user_organizations** - User-org relationships
+- **elections** - Election management
+- **candidates** - Election candidates
+- **votes** - Basic vote records
+- **encrypted_votes** - Encrypted vote data
+- **merkle_trees** - Vote verification trees
+- **zk_proofs** - Zero-knowledge proofs
+- **vote_verifications** - Vote verification records
+- **user_sessions** - Session management
+- **otps** - OTP verification
+- **access_tokens** - Invitation tokens
+- **audit_logs** - Security audit trail
+- **mfa_tokens** - Multi-factor authentication
+
+### **Security Features**
+- **Row Level Security (RLS)** - All tables protected
+- **Complex Tokens** - 64+ character security tokens
+- **Session Expiration** - Automatic cleanup
+- **Audit Logging** - Complete activity tracking
+
+---
+
+## 🔧 Development Commands
+
+```bash
+# Development
+npm run dev          # Start frontend (port 3000)
+npm run server       # Start backend (port 5000)
+npm run dev:all      # Start both servers
+
+# Building
+npm run build        # Build for production
+npm run preview      # Preview production build
+
+# Testing
+npm run test         # Run unit tests
+npm run test:e2e     # Run end-to-end tests
+npm run test:coverage # Run tests with coverage
+
+# Code Quality
+npm run lint         # Run ESLint
+npm run type-check   # TypeScript type checking
 ```
-Organizations
-├── Organization A (school.example.com)
-│   ├── Users (isolated)
-│   ├── Elections (isolated)
-│   └── Results (isolated)
-├── Organization B (college.example.com)
-│   ├── Users (isolated)
-│   ├── Elections (isolated)
-│   └── Results (isolated)
-└── Organization C (corp.example.com)
-    ├── Users (isolated)
-    ├── Elections (isolated)
-    └── Results (isolated)
-```
 
-### **Authentication Flow**
-1. **Organization Selection** - User selects or is assigned to organization
-2. **Authentication** - Traditional email/password or MetaMask
-3. **Session Creation** - Secure session token generation
-4. **Access Control** - Role-based permissions
-
-### **Data Isolation**
-- **Row Level Security (RLS)** - Database-level isolation
-- **Organization Context** - Application-level isolation
-- **Session Scoping** - User session isolation
+---
 
 ## 🚀 Deployment
 
-### **Vercel Deployment**
+### **Frontend (Vercel)**
 ```bash
-# Build for production
-npm run build
+# Install Vercel CLI
+npm i -g vercel
 
-# Deploy to Vercel
+# Deploy
 vercel --prod
 ```
 
-### **Environment Variables (Vercel)**
-Set these in your Vercel project settings:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_SAAS_MODE`
-- `VITE_DEFAULT_ORG_SLUG`
+### **Backend (Railway/Render)**
+```bash
+# Set environment variables
+SERVER_PORT=5000
+NODE_ENV=production
 
-### **Custom Domains**
-1. Configure DNS for your domain
-2. Set up subdomain routing
-3. Update organization settings
+# Deploy
+npm run build
+npm start
+```
 
-## 📊 Pricing Tiers
+### **Database (Supabase)**
+- **Production**: Use Supabase Cloud
+- **Development**: Use Supabase Local
 
-### **Free Tier**
-- Up to 100 voters
-- 5 active elections
-- Basic support
-- Standard features
+---
 
-### **Pro Tier ($29/month)**
-- Up to 1,000 voters
-- Unlimited elections
-- Priority support
-- Custom branding
-- Advanced analytics
-
-### **Enterprise Tier (Custom)**
-- Unlimited voters
-- Unlimited elections
-- Dedicated support
-- Custom integrations
-- SLA guarantee
-- On-premise option
-
-## 🔧 Configuration
+## 📱 User Flows
 
 ### **Organization Setup**
-1. **Create Organization** - Via SaaS landing page
-2. **Configure Domain** - Set custom subdomain
-3. **Add Admins** - Assign organization administrators
-4. **Customize Settings** - Branding and preferences
+1. **Create Organization** - Admin creates org with email/password
+2. **Email Verification** - OTP verification required
+3. **Invite Members** - Upload CSV or send individual invitations
+4. **Member Registration** - Members join via invitation links
 
-### **Security Settings**
-- **Password Policies** - Minimum requirements
-- **Session Timeout** - Automatic logout
-- **Login Attempts** - Account locking
-- **Audit Logging** - Activity monitoring
+### **Election Process**
+1. **Create Election** - Admin sets up election with candidates
+2. **Activate Election** - Election becomes available for voting
+3. **Cast Votes** - Members vote securely with encryption
+4. **Get Receipt** - Digital receipt with verification code
+5. **Verify Vote** - Verify vote was counted correctly
+6. **View Results** - Real-time election results
+
+### **Security Features**
+1. **Session Management** - Secure login/logout
+2. **Vote Encryption** - End-to-end vote protection
+3. **Audit Logging** - Complete activity tracking
+4. **Access Control** - Role-based permissions
+
+---
 
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-### **Development Process**
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+### **Development Setup**
+```bash
+# Fork and clone
+git clone https://github.com/yourusername/ematdaan.git
+cd ematdaan
+
+# Install dependencies
+npm install
+
+# Start development
+npm run dev:all
+
+# Make changes and test
+npm run test
+npm run lint
+```
 
 ### **Code Style**
-- Follow TypeScript best practices
-- Use ESLint and Prettier
-- Write meaningful commit messages
-- Add proper documentation
+- **TypeScript** - Strict type checking
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **Conventional Commits** - Commit message format
+
+---
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+---
 
-### **Documentation**
-- [User Guide](docs/user-guide.md)
-- [Admin Guide](docs/admin-guide.md)
-- [API Documentation](docs/api.md)
-- [Security Guide](docs/security.md)
+## 🙏 Acknowledgments
 
-### **Community**
-- [GitHub Issues](https://github.com/yourusername/ematdaan/issues)
-- [Discussions](https://github.com/yourusername/ematdaan/discussions)
-- [Email Support](mailto:support@ematdaan.com)
-
-### **Enterprise Support**
-For enterprise customers, we offer:
-- Dedicated support channels
-- Custom integrations
-- On-premise deployment
-- Training and consulting
-
-## 🔄 Version History
-
-### **v2.0.0 (Current) - SaaS Platform**
-- ✅ Multi-tenant architecture
-- ✅ Traditional authentication
-- ✅ Organization management
-- ✅ Custom domains
-- ✅ Role-based access control
-
-### **v1.0.0 - Single Tenant**
-- ✅ MetaMask authentication
-- ✅ Basic voting system
-- ✅ Merkle tree verification
-- ✅ Real-time results
-
-## 🗺️ Roadmap
-
-### **Q1 2024**
-- [ ] Advanced analytics dashboard
-- [ ] Mobile application
-- [ ] API rate limiting
-- [ ] Enhanced security features
-
-### **Q2 2024**
-- [ ] Multi-language support
-- [ ] Advanced reporting
-- [ ] Integration marketplace
-- [ ] White-label solutions
-
-### **Q3 2024**
-- [ ] Blockchain integration
-- [ ] Advanced audit features
-- [ ] Machine learning insights
-- [ ] Enterprise SSO
+- **Supabase** - Backend infrastructure
+- **Vite** - Build tool and dev server
+- **TailwindCSS** - Styling framework
+- **React** - UI framework
+- **Express.js** - Backend framework
 
 ---
 
-**Built with ❤️ for secure, transparent democracy**
+<div align="center">
+  <p>Made with ❤️ for secure digital democracy</p>
+  <p>
+    <a href="https://github.com/yourusername/ematdaan">GitHub</a> •
+    <a href="https://ematdaan.vercel.app">Live Demo</a> •
+    <a href="https://ematdaan.vercel.app/docs">Documentation</a>
+  </p>
+</div>

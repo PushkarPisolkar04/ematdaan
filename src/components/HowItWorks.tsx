@@ -7,42 +7,42 @@ const HowItWorks = () => {
     {
       icon: <Building className="h-8 w-8" />,
       title: "Organization Setup",
-      description: "Create or join an organization to participate in elections.",
+      description: "Create your organization or join an existing one with an invitation token.",
       color: "text-blue-600",
       bgColor: "bg-blue-50"
     },
     {
-      icon: <Key className="h-8 w-8" />,
-      title: "Get Access Code",
-      description: "Receive your unique access code from your organization admin.",
+      icon: <User className="h-8 w-8" />,
+      title: "Account Creation",
+      description: "Set up your account with email and password authentication.",
       color: "text-green-600",
       bgColor: "bg-green-50"
     },
     {
-      icon: <User className="h-8 w-8" />,
-      title: "Sign In",
-      description: "Use your access code to sign in to the platform.",
+      icon: <Vote className="h-8 w-8" />,
+      title: "Cast Your Vote",
+      description: "Participate in active elections with secure, encrypted voting.",
       color: "text-purple-600",
       bgColor: "bg-purple-50"
     },
     {
-      icon: <Vote className="h-8 w-8" />,
-      title: "Cast Vote",
-      description: "Cast your vote securely with encryption.",
+      icon: <FileText className="h-8 w-8" />,
+      title: "Get Receipt",
+      description: "Receive a digital receipt with verification code and QR code.",
       color: "text-red-600",
       bgColor: "bg-red-50"
     },
     {
-      icon: <FileText className="h-8 w-8" />,
-      title: "Get Receipt",
-      description: "Receive a Merkle tree proof as your vote receipt.",
+      icon: <Eye className="h-8 w-8" />,
+      title: "Verify Vote",
+      description: "Use your receipt to verify your vote was counted correctly.",
       color: "text-indigo-600",
       bgColor: "bg-indigo-50"
     },
     {
       icon: <CheckCircle className="h-8 w-8" />,
       title: "View Results",
-      description: "View real-time election results and statistics.",
+      description: "See real-time election results and detailed analytics.",
       color: "text-emerald-600",
       bgColor: "bg-emerald-50"
     }
@@ -74,11 +74,11 @@ const HowItWorks = () => {
                   <ol className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
                       <span className="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">1</span>
-                      <span>Get access code from your organization admin</span>
+                      <span>Get invitation token from your organization admin</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
-                      <span>Sign in using the access code</span>
+                      <span>Join organization and create your account</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
@@ -95,7 +95,7 @@ const HowItWorks = () => {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
-                      <span>Generate access codes for members</span>
+                      <span>Invite members via email or CSV upload</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
@@ -150,24 +150,24 @@ const HowItWorks = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Voter Code</Badge>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Voter</Badge>
                   <div>
                     <p className="font-medium text-sm">For regular voters</p>
-                    <p className="text-gray-600 text-xs">Allows voting in elections</p>
+                    <p className="text-gray-600 text-xs">Can vote in elections</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Admin Code</Badge>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Admin</Badge>
                   <div>
                     <p className="font-medium text-sm">For organization admins</p>
                     <p className="text-gray-600 text-xs">Create elections, manage members</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Owner Code</Badge>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Owner</Badge>
                   <div>
                     <p className="font-medium text-sm">For organization owners</p>
-                    <p className="text-gray-600 text-xs">Full control over settings</p>
+                    <p className="text-gray-600 text-xs">Full control over organization</p>
                   </div>
                 </div>
               </div>

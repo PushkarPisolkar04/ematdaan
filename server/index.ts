@@ -2,12 +2,49 @@ import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Security middleware
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-domain.com'] // Replace with your actual domain
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'self'");
+  next();
+});
+
+// Rate limiting for email endpoints
+const emailRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many email requests. Please try again in 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Email validation function
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+};
 
 // Create nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -30,14 +67,31 @@ transporter.verify((error, success) => {
 });
 
 // Send OTP endpoint
-app.post('/api/send-otp', async (req, res) => {
+app.post('/api/send-otp', emailRateLimit, async (req, res) => {
   try {
     const { email, otp } = req.body;
 
+    // Validate input
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
         message: 'Email and OTP are required',
+      });
+    }
+
+    // Validate email format
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+      });
+    }
+
+    // Validate OTP format (should be 6 digits)
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP format',
       });
     }
 
@@ -60,10 +114,69 @@ app.post('/api/send-otp', async (req, res) => {
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
-    console.error('Failed to send OTP email:', error);
+    // Log error securely without exposing sensitive data
+    console.error('Failed to send OTP email - Error type:', error instanceof Error ? error.constructor.name : typeof error);
     res.status(500).json({
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to send OTP',
+      message: 'Failed to send OTP. Please try again.',
+    });
+  }
+});
+
+// Send invitation endpoint
+app.post('/send-invitation', emailRateLimit, async (req, res) => {
+  try {
+    const { to, subject, html } = req.body;
+
+    // Validate input
+    if (!to || !subject || !html) {
+      return res.status(400).json({
+        success: false,
+        message: 'To, subject, and html are required',
+      });
+    }
+
+    // Validate email format
+    if (!isValidEmail(to)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+      });
+    }
+
+    // Validate subject length
+    if (subject.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject too long',
+      });
+    }
+
+    // Validate HTML content length
+    if (html.length > 50000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email content too long',
+      });
+    }
+
+    await transporter.sendMail({
+      from: process.env.VITE_SMTP_FROM,
+      to: to,
+      subject: subject,
+      html: html,
+    });
+
+    res.json({
+      success: true,
+      message: 'Invitation email sent successfully',
+    });
+  } catch (error) {
+    // Log error securely without exposing sensitive data
+    console.error('Failed to send invitation email - Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send invitation email. Please try again.',
     });
   }
 });

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { generateElectionResultsReport } from '@/lib/receipt';
 import { Loader2, Trophy, Download, Share2, Users, Vote, TrendingUp } from 'lucide-react';
 
 interface Candidate {
@@ -152,11 +153,44 @@ const Results: React.FC = () => {
     }
   };
 
-  const handleExportPDF = () => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "PDF export functionality will be available soon"
-    });
+  const handleExportPDF = async () => {
+    if (!results) return;
+
+    try {
+      await generateElectionResultsReport({
+        election: results.election,
+        candidates: results.candidates.map(candidate => ({
+          id: candidate.id,
+          name: candidate.name,
+          party: candidate.party || 'Independent',
+          symbol: candidate.symbol || '',
+          vote_count: candidate.vote_count,
+          percentage: candidate.percentage
+        })),
+        totalVotes: results.totalVotes,
+        totalEligibleVoters: results.totalEligibleVoters,
+        participationRate: results.participationRate,
+        winner: winner ? {
+          id: winner.id,
+          name: winner.name,
+          party: winner.party || 'Independent',
+          vote_count: winner.vote_count,
+          percentage: winner.percentage
+        } : undefined
+      });
+
+      toast({
+        title: "PDF Report Generated",
+        description: "Election results report has been downloaded"
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF report:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate PDF report. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleExportCSV = () => {

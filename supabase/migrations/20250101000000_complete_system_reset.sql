@@ -34,6 +34,16 @@ DROP FUNCTION IF EXISTS create_user_session(UUID, UUID, INET, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS invalidate_session(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS log_audit_event(UUID, UUID, TEXT, JSONB) CASCADE;
 DROP FUNCTION IF EXISTS cleanup_expired_sessions() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_tokens() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_otps() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_mfa() CASCADE;
+DROP FUNCTION IF EXISTS run_all_cleanup_operations() CASCADE;
+DROP FUNCTION IF EXISTS auto_cleanup_expired() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_tokens() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_otps() CASCADE;
+DROP FUNCTION IF EXISTS cleanup_expired_mfa() CASCADE;
+DROP FUNCTION IF EXISTS run_all_cleanup_operations() CASCADE;
+
 DROP FUNCTION IF EXISTS set_organization_context(UUID) CASCADE;
 DROP FUNCTION IF EXISTS set_user_context(UUID) CASCADE;
 DROP FUNCTION IF EXISTS generate_access_code() CASCADE;
@@ -443,6 +453,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- =====================================================
+-- COMPLETE CLEANUP SYSTEM
+-- =====================================================
+
 -- Cleanup expired sessions
 CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
 RETURNS INTEGER AS $$
@@ -456,6 +470,80 @@ BEGIN
     RETURN deleted_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cleanup expired access tokens
+CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM access_tokens 
+    WHERE expires_at < NOW() OR is_active = false;
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cleanup expired OTPs
+CREATE OR REPLACE FUNCTION cleanup_expired_otps()
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM otps 
+    WHERE expires_at < NOW() OR is_verified = true;
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cleanup expired MFA tokens
+CREATE OR REPLACE FUNCTION cleanup_expired_mfa()
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM mfa_tokens 
+    WHERE expires_at < NOW() OR used = true;
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Master cleanup function - runs all cleanup operations
+CREATE OR REPLACE FUNCTION run_all_cleanup_operations()
+RETURNS JSONB AS $$
+DECLARE
+    sessions_cleaned INTEGER;
+    tokens_cleaned INTEGER;
+    otps_cleaned INTEGER;
+    mfa_cleaned INTEGER;
+    total_cleaned INTEGER;
+BEGIN
+    -- Run all cleanup operations
+    SELECT cleanup_expired_sessions() INTO sessions_cleaned;
+    SELECT cleanup_expired_tokens() INTO tokens_cleaned;
+    SELECT cleanup_expired_otps() INTO otps_cleaned;
+    SELECT cleanup_expired_mfa() INTO mfa_cleaned;
+    
+    total_cleaned := sessions_cleaned + tokens_cleaned + otps_cleaned + mfa_cleaned;
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'total_cleaned', total_cleaned,
+        'sessions_cleaned', sessions_cleaned,
+        'tokens_cleaned', tokens_cleaned,
+        'otps_cleaned', otps_cleaned,
+        'mfa_cleaned', mfa_cleaned,
+        'timestamp', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -726,6 +814,8 @@ CREATE TRIGGER update_organizations_updated_at
 CREATE TRIGGER update_auth_users_updated_at 
     BEFORE UPDATE ON auth_users 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
 
 -- =====================================================
 -- STEP 8: INSERT SAMPLE DATA (OPTIONAL)

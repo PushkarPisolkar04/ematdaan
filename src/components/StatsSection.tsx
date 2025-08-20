@@ -40,7 +40,7 @@ const StatsSection = () => {
     {
       icon: Vote,
       value: loading ? "..." : formatNumber(stats?.totalVotes || 0),
-      label: "Total Votes",
+      label: "Total Votes Cast",
       description: "Secure votes processed",
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -55,7 +55,7 @@ const StatsSection = () => {
     },
     {
       icon: Calendar,
-      value: loading ? "..." : stats?.activeElections || 0,
+      value: loading ? "..." : (stats?.activeElections || 0),
       label: "Active Elections",
       description: "Currently running",
       color: "from-emerald-600 to-teal-600",
@@ -63,9 +63,9 @@ const StatsSection = () => {
     },
     {
       icon: CheckCircle,
-      value: loading ? "..." : stats?.totalElections || 0,
-      label: "Total Elections",
-      description: "Successfully completed",
+      value: loading ? "..." : (stats?.totalElections || 0),
+      label: "Completed Elections",
+      description: "Successfully finished",
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
     },
@@ -125,19 +125,7 @@ const StatsSection = () => {
             })}
           </div>
           
-          {stats && !loading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              viewport={{ once: true }}
-              className="text-center mt-8"
-            >
-              <p className="text-gray-500 text-sm">
-                Last updated: {new Date().toLocaleTimeString()}
-              </p>
-            </motion.div>
-          )}
+
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { generateSecureOTP, isValidOTPFormat } from '@/lib/secureUtils';
 
 interface User {
   id: string;
@@ -35,7 +36,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
   createOrganization: (data: {
     name: string;
     ownerName: string;
@@ -47,6 +47,8 @@ interface AuthContextType {
     email: string;
     password: string;
   }) => Promise<void>;
+  sendOTP: (email: string) => Promise<void>;
+  verifyOTP: (email: string, otp: string) => Promise<boolean>;
   refreshSession: () => Promise<void>;
 }
 
@@ -273,55 +275,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
-    try {
-      setIsLoading(true);
 
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', email)
-        .single();
-
-      if (existingUser) {
-        throw new Error('User already exists with this email');
-      }
-
-      // Create user (in a real app, password would be hashed)
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .insert({
-          email,
-          password_hash: password, // This should be hashed in production
-          name,
-          role: 'student',
-          is_verified: false
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        throw new Error('Failed to create user');
-      }
-
-      toast({
-        title: "Registration Successful",
-        description: "Please check your email for verification"
-      });
-
-    } catch (error) {
-      console.error('Registration failed:', error);
-      toast({
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : 'An error occurred during registration',
-        variant: "destructive"
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const createOrganization = async (data: {
     name: string;
@@ -519,6 +473,110 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await checkSession();
   };
 
+  const sendOTP = async (email: string) => {
+    try {
+      // Generate secure OTP
+      const otp = generateSecureOTP();
+      
+      // Send OTP via email using server endpoint
+      const response = await fetch('http://localhost:5000/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send OTP');
+      }
+
+      // Store OTP temporarily (in production, this should be server-side)
+      sessionStorage.setItem('pending_otp', JSON.stringify({ email, otp, timestamp: Date.now() }));
+
+      toast({
+        title: "OTP Sent",
+        description: "Please check your email for the verification code"
+      });
+
+    } catch (error) {
+      console.error('Failed to send OTP:', error);
+      toast({
+        title: "OTP Failed",
+        description: "Failed to send verification code. Please try again.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
+    try {
+      // Validate OTP format
+      if (!isValidOTPFormat(otp)) {
+        toast({
+          title: "Invalid OTP",
+          description: "Please enter a valid 6-digit code",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Get stored OTP
+      const storedOTPData = sessionStorage.getItem('pending_otp');
+      if (!storedOTPData) {
+        toast({
+          title: "OTP Expired",
+          description: "Please request a new verification code",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      const { email: storedEmail, otp: storedOTP, timestamp } = JSON.parse(storedOTPData);
+      
+      // Check if email matches and OTP is not expired (5 minutes)
+      if (email !== storedEmail || Date.now() - timestamp > 5 * 60 * 1000) {
+        sessionStorage.removeItem('pending_otp');
+        toast({
+          title: "OTP Expired",
+          description: "Please request a new verification code",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Verify OTP
+      if (otp !== storedOTP) {
+        toast({
+          title: "Invalid OTP",
+          description: "The verification code is incorrect",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Clear stored OTP
+      sessionStorage.removeItem('pending_otp');
+
+      toast({
+        title: "OTP Verified",
+        description: "Email verification successful"
+      });
+
+      return true;
+
+    } catch (error) {
+      console.error('OTP verification failed:', error);
+      toast({
+        title: "Verification Failed",
+        description: "Failed to verify OTP. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     organization,
@@ -527,9 +585,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     login,
     logout,
-    register,
     createOrganization,
     joinOrganization,
+    sendOTP,
+    verifyOTP,
     refreshSession
   };
 

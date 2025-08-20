@@ -66,7 +66,11 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/results/:electionId" element={<Results />} />
+            <Route path="/results/:electionId" element={
+              <ProtectedRoute>
+                <Results />
+              </ProtectedRoute>
+            } />
             
             <Route path="/profile" element={
               <ProtectedRoute>

@@ -97,11 +97,10 @@ const Index = () => {
   useEffect(() => {
     const fetchElections = async () => {
       try {
-        const elections = await electionApi.getActiveElections('');
-        setActiveElections(elections);
-        if (elections.length > 0) {
-          setSelectedElection(elections[0]);
-        }
+        // Only fetch elections if we have a valid organization_id
+        // For the home page, we'll show a message instead of trying to fetch with empty org_id
+        setActiveElections([]);
+        setSelectedElection(null);
       } catch (error) {
         console.error('Failed to fetch elections:', error);
       }
@@ -327,12 +326,7 @@ const Index = () => {
                         </div>
                       </div>
 
-                      {/* Real-time indicator */}
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 text-center">
-                          {statsLoading ? 'Loading...' : 'Updated in real-time • Last refresh: just now'}
-                        </p>
-                      </div>
+
                     </div>
                     
                     {/* Floating Elements */}

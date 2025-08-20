@@ -4,44 +4,52 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const FAQSection = () => {
   const faqs = [
     {
-      question: "How is my vote secured?",
-      answer: "Your vote is protected using AES-256 encryption, zero-knowledge proofs, and digital signatures. A Merkle tree system is used to verify votes without compromising privacy."
+      question: "How secure is the voting system?",
+      answer: "E-Matdaan uses military-grade AES-256 encryption, zero-knowledge proofs, and digital signatures to protect your vote. Each vote is encrypted before storage and can only be decrypted with proper authorization. Our Merkle tree system ensures vote integrity without compromising privacy."
     },
     {
-      question: "What authentication methods are supported?",
-      answer: "We support traditional email/password authentication with OTP verification. This makes the system accessible to everyone without requiring cryptocurrency wallets."
+      question: "How do I create an organization?",
+      answer: "Creating an organization is simple! Click 'Create Organization' on the login page, fill in your organization name, your details as admin, and set a secure password. Once created, you can invite members and start creating elections immediately."
     },
     {
-      question: "Can I vote again?",
-      answer: "No, the system prevents double voting through database checks and unique voter identification. Once you cast your vote, it's recorded with your unique digital signature."
+      question: "How do I join an existing organization?",
+      answer: "You'll need an invitation token from your organization admin. Click 'Join Organization' on the login page, enter the token, your personal details, and create your account. The token ensures only authorized users can join."
     },
     {
-      question: "How can I verify my vote?",
-      answer: "After voting, you'll receive a receipt with a Merkle proof. You can use this receipt on our verification portal to confirm your vote was recorded correctly and included in the final count."
+      question: "Can I vote multiple times in the same election?",
+      answer: "No, the system prevents double voting through sophisticated database checks and unique voter identification. Each user can only vote once per election, and this is enforced at both the application and database levels."
+    },
+    {
+      question: "How can I verify that my vote was counted?",
+      answer: "After voting, you'll receive a digital receipt with a unique verification code and QR code. You can use this receipt on our verification portal to confirm your vote was recorded correctly and included in the final count without revealing your choice."
     },
     {
       question: "What if I forget my password?",
-      answer: "You can reset your password using the 'Forgot Password' feature. A reset link will be sent to your registered email address."
+      answer: "Use the 'Forgot Password' link on the login page. Enter your email address and we'll send you a secure reset link. The link expires after 24 hours for security. If you continue having issues, contact your organization admin."
     },
     {
-      question: "Is my personal information stored securely?",
-      answer: "Yes, personal information is stored securely in our database with encryption. Only encrypted vote data and verification hashes are stored, ensuring your privacy is protected."
+      question: "Is my personal information safe?",
+      answer: "Absolutely! We use industry-standard encryption for all personal data. Your vote choices are encrypted and cannot be linked back to you. Only your organization admin can see basic account information, and even they cannot see how you voted."
     },
     {
-      question: "How do I know the system is secure?",
-      answer: "The system uses multi-factor authentication, AES-256 encryption, zero-knowledge proofs, and blockchain verification to ensure vote integrity. All actions are logged and monitored for security."
+      question: "What happens if there's a power outage or technical issue?",
+      answer: "Our system is built with redundancy and automatic backups. If you experience issues during voting, your partial vote is saved and you can continue where you left off. All data is backed up in real-time to prevent any loss."
     },
     {
-      question: "What happens if there's a technical issue?",
-      answer: "Our technical support team is available during voting periods. The system has database backups, recovery procedures, and redundant systems in place to ensure reliability."
+      question: "Can I see the election results?",
+      answer: "Yes! Once an election ends, results are automatically calculated and displayed. You can view detailed statistics, candidate performance, and participation rates. Results are also available for download as PDF reports."
     },
     {
-      question: "Can anyone see how I voted?",
-      answer: "No, votes are encrypted before being stored in the database. Only the final tally is visible once the election ends. Individual vote choices remain completely private."
+      question: "How do I invite members to my organization?",
+      answer: "As an admin, go to the Admin Dashboard and use the 'Invite Members' feature. You can invite individuals by email or upload a CSV file for bulk invitations. Each invitation includes a secure token for joining."
     },
     {
       question: "What makes E-Matdaan different from other voting systems?",
-      answer: "E-Matdaan combines enterprise-grade security with user-friendly design. We use zero-knowledge proofs, homomorphic encryption, and blockchain verification while maintaining accessibility for all users."
+      answer: "E-Matdaan combines enterprise-grade security with user-friendly design. Unlike complex blockchain systems, we use advanced cryptography that's accessible to everyone. Our system supports multiple organizations, provides detailed analytics, and ensures complete vote privacy while maintaining transparency."
+    },
+    {
+      question: "How do I know the election results are accurate?",
+      answer: "Our system uses cryptographic proofs to ensure accuracy. Each vote is digitally signed and verified. The final count is mathematically provable, and you can verify your own vote was included. All election data is auditable while maintaining voter privacy."
     }
   ];
 

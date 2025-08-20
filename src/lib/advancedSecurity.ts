@@ -479,3 +479,44 @@ const verifyZKProof = async (zkProof: ZKProof): Promise<boolean> => {
     return false;
   }
 }; 
+
+// Election Encryption Key Generation
+export interface ElectionKeys {
+  publicKey: {
+    n: string;
+    e: string;
+  };
+  privateKey: {
+    n: string;
+    d: string;
+  };
+}
+
+export const generateElectionKeys = async (): Promise<ElectionKeys> => {
+  // Generate RSA key pair for election encryption
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: 'RSA-OAEP',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256'
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  
+  // Export keys
+  const publicKey = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+  const privateKey = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+  
+  return {
+    publicKey: {
+      n: publicKey.n || '',
+      e: publicKey.e || ''
+    },
+    privateKey: {
+      n: privateKey.n || '',
+      d: privateKey.d || ''
+    }
+  };
+}; 
