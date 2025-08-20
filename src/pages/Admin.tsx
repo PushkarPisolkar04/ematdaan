@@ -17,20 +17,23 @@ import {
   Mail,
   RefreshCw,
   ArrowLeft,
-  FileText
+  Loader2
 } from 'lucide-react';
-import { supabase, electionApi, candidateApi } from '@/lib/supabase';
-import { generateAuditReport } from '@/lib/receipt';
+import { supabase, candidateApi } from '@/lib/supabase';
+import { electionApi } from '@/lib/electionApi';
+
 
 interface Election {
   id: string;
   name: string;
-  description?: string;
   start_time: string;
   end_time: string;
   is_active: boolean;
-  total_votes: number;
-  candidates_count: number;
+  organization_id: string;
+  created_at: string;
+  candidates?: any[];
+  total_votes?: number;
+  candidates_count?: number;
 }
 
 interface User {
@@ -53,6 +56,7 @@ const Admin = () => {
     totalVotes: 0,
     pendingInvitations: 0
   });
+  const [statsLoading, setStatsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, organization, userRole, isAuthenticated } = useAuth();
@@ -84,6 +88,13 @@ const Admin = () => {
     loadAdminData();
   }, [isAuthenticated, userRole, organization]);
 
+  // Recalculate stats when users or elections change
+  useEffect(() => {
+    if ((users.length > 0 || elections.length > 0) && organization?.id) {
+      loadStats(users, elections);
+    }
+  }, [users, elections, organization?.id]);
+
   const loadAdminData = async () => {
     if (!organization) return;
     
@@ -91,8 +102,7 @@ const Admin = () => {
       setIsLoading(true);
       await Promise.all([
         loadElections(),
-        loadUsers(),
-        loadStats()
+        loadUsers()
       ]);
     } catch (error) {
       console.error('Failed to load admin data:', error);
@@ -108,7 +118,7 @@ const Admin = () => {
 
   const loadElections = async () => {
     try {
-      const electionsData = await electionApi.getSchedule(organization?.id);
+      const electionsData = await electionApi.getElections(organization?.id);
       
       const processedElections = await Promise.all((electionsData || []).map(async (election) => {
         // Get vote count for this election
@@ -118,12 +128,7 @@ const Admin = () => {
           .eq('election_id', election.id);
 
         return {
-          id: election.id,
-          name: election.name,
-          description: election.description,
-          start_time: election.start_time,
-          end_time: election.end_time,
-          is_active: election.is_active,
+          ...election,
           total_votes: totalVotes || 0,
           candidates_count: election.candidates?.length || 0
         };
@@ -173,19 +178,21 @@ const Admin = () => {
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (currentUsers: User[], currentElections: Election[]) => {
     try {
-      const totalUsers = users.length;
-      const activeElections = elections.filter(e => e.is_active).length;
-      const totalVotes = elections.reduce((sum, e) => sum + e.total_votes, 0);
+      setStatsLoading(true);
+      const totalUsers = currentUsers.length;
+      const activeElections = currentElections.filter(e => e.is_active).length;
+      const totalVotes = currentElections.reduce((sum, e) => sum + (e.total_votes || 0), 0);
 
       // Get pending invitations count
-      const { count: pendingInvitations } = await supabase
+      const { data: accessTokens } = await supabase
         .from('access_tokens')
-        .select('id', { count: 'exact', head: true })
+        .select('id, used_count, usage_limit')
         .eq('organization_id', organization?.id)
-        .eq('is_active', true)
-        .lt('used_count', 'usage_limit');
+        .eq('is_active', true);
+      
+      const pendingInvitations = accessTokens?.filter(token => token.used_count < token.usage_limit).length || 0;
 
       setStats({
         totalUsers,
@@ -196,6 +203,8 @@ const Admin = () => {
     } catch (error) {
       console.error('Failed to load stats:', error);
       throw error;
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -214,7 +223,7 @@ const Admin = () => {
     try {
       setIsLoading(true);
       
-      await electionApi.setSchedule({
+      await electionApi.createElection({
         name: newElection.name,
         startTime: newElection.startDate,
         endTime: newElection.endDate,
@@ -248,12 +257,7 @@ const Admin = () => {
 
   const handleToggleElectionStatus = async (electionId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('elections')
-        .update({ is_active: !currentStatus })
-        .eq('id', electionId);
-
-      if (error) throw error;
+      await electionApi.updateElection(electionId, { isActive: !currentStatus });
 
       toast({
         title: "Status Updated",
@@ -277,12 +281,7 @@ const Admin = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('elections')
-        .delete()
-        .eq('id', electionId);
-
-      if (error) throw error;
+      await electionApi.deleteElection(electionId);
 
       toast({
         title: "Election Deleted",
@@ -300,114 +299,7 @@ const Admin = () => {
     }
   };
 
-  const handleGenerateAuditReport = async (electionId: string) => {
-    try {
-      // Get election details
-      const { data: election, error: electionError } = await supabase
-        .from('elections')
-        .select('*')
-        .eq('id', electionId)
-        .single();
 
-      if (electionError || !election) {
-        throw new Error('Election not found');
-      }
-
-      // Get audit logs
-      const { data: auditLogs, error: auditError } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('organization_id', organization?.id)
-        .gte('created_at', election.start_time)
-        .lte('created_at', election.end_time)
-        .order('created_at', { ascending: true });
-
-      if (auditError) {
-        console.warn('Failed to fetch audit logs:', auditError);
-      }
-
-      // Get vote logs
-      const { data: voteLogs, error: voteError } = await supabase
-        .from('votes')
-        .select('*')
-        .eq('election_id', electionId)
-        .order('created_at', { ascending: true });
-
-      if (voteError) {
-        console.warn('Failed to fetch vote logs:', voteError);
-      }
-
-      // Get user statistics
-      const { count: totalRegistered } = await supabase
-        .from('user_organizations')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organization?.id)
-        .eq('is_active', true);
-
-      const totalVoted = voteLogs?.length || 0;
-      const totalAbstained = (totalRegistered || 0) - totalVoted;
-
-      // Get security metrics
-      const { count: totalSessions } = await supabase
-        .from('user_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organization?.id)
-        .gte('created_at', election.start_time)
-        .lte('created_at', election.end_time);
-
-      const { count: totalOTPs } = await supabase
-        .from('otps')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', election.start_time)
-        .lte('created_at', election.end_time);
-
-      const { count: totalMFA } = await supabase
-        .from('mfa_tokens')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', election.start_time)
-        .lte('created_at', election.end_time);
-
-      // Generate audit report
-      await generateAuditReport({
-        election: {
-          id: election.id,
-          name: election.name,
-          start_time: election.start_time,
-          end_time: election.end_time
-        },
-        organization: {
-          id: organization?.id || '',
-          name: organization?.name || ''
-        },
-        auditLogs: auditLogs || [],
-        voteLogs: voteLogs || [],
-        userStats: {
-          totalRegistered: totalRegistered || 0,
-          totalVoted,
-          totalAbstained
-        },
-        securityMetrics: {
-          totalSessions: totalSessions || 0,
-          totalOTPs: totalOTPs || 0,
-          totalMFA: totalMFA || 0,
-          suspiciousActivities: 0 // This would be calculated based on your security rules
-        }
-      });
-
-      toast({
-        title: "Audit Report Generated",
-        description: "Election audit report has been downloaded"
-      });
-
-    } catch (error) {
-      console.error('Failed to generate audit report:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to generate audit report. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
 
 
 
@@ -434,6 +326,15 @@ const Admin = () => {
                 {organization?.name} • Manage elections, users, and settings
               </p>
             </div>
+            <Button
+              onClick={loadAdminData}
+              variant="outline"
+              size="sm"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Data
+            </Button>
           </div>
         </div>
 
@@ -444,7 +345,13 @@ const Admin = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600">Total Users</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.totalUsers}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {statsLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin inline" />
+                    ) : (
+                      stats.totalUsers
+                    )}
+                  </p>
                 </div>
                 <Users className="h-6 w-6 text-blue-600" />
               </div>
@@ -456,7 +363,13 @@ const Admin = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600">Active Elections</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.activeElections}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {statsLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin inline" />
+                    ) : (
+                      stats.activeElections
+                    )}
+                  </p>
                 </div>
                 <Vote className="h-6 w-6 text-purple-600" />
               </div>
@@ -468,7 +381,13 @@ const Admin = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600">Total Votes</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.totalVotes}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {statsLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin inline" />
+                    ) : (
+                      stats.totalVotes
+                    )}
+                  </p>
                 </div>
                 <BarChart3 className="h-6 w-6 text-indigo-600" />
               </div>
@@ -480,7 +399,13 @@ const Admin = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-gray-600">Pending Invitations</p>
-                  <p className="text-xl font-bold text-gray-900">{stats.pendingInvitations}</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {statsLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin inline" />
+                    ) : (
+                      stats.pendingInvitations
+                    )}
+                  </p>
                 </div>
                 <Mail className="h-6 w-6 text-pink-600" />
               </div>
@@ -640,15 +565,7 @@ const Admin = () => {
                         >
                           Manage Candidates
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGenerateAuditReport(election.id)}
-                          className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                        >
-                          <FileText className="h-3 w-3 mr-1" />
-                          Audit Report
-                        </Button>
+
                         <Button
                           variant="destructive"
                           size="sm"

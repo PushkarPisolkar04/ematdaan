@@ -99,6 +99,39 @@ export const electionApi = {
         throw new Error('Start time cannot be more than 24 hours in the past');
       }
 
+      // Get current user from localStorage to set context
+      const userDataStr = localStorage.getItem('user_data');
+      if (!userDataStr) {
+        throw new Error('User session not found. Please log in again.');
+      }
+      
+      const userData = JSON.parse(userDataStr);
+      
+      console.log('Setting user context for user:', userData.id);
+      console.log('Setting organization context for org:', electionData.organizationId);
+      
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session);
+      
+      // Set user context for RLS policies
+      const { error: userContextError } = await supabase.rpc('set_user_context', {
+        p_user_id: userData.id
+      });
+      
+      if (userContextError) {
+        console.error('Failed to set user context:', userContextError);
+      }
+
+      // Set organization context for RLS policies
+      const { error: orgContextError } = await supabase.rpc('set_organization_context', {
+        p_organization_id: electionData.organizationId
+      });
+      
+      if (orgContextError) {
+        console.error('Failed to set organization context:', orgContextError);
+      }
+
       // Insert the election
       const { data: election, error: electionError } = await supabase
         .from('elections')
@@ -126,6 +159,22 @@ export const electionApi = {
 
   async getSchedule(organizationId: string) {
     try {
+      // Get current user from localStorage to set context
+      const userDataStr = localStorage.getItem('user_data');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        
+        // Set user context for RLS policies
+        await supabase.rpc('set_user_context', {
+          p_user_id: userData.id
+        });
+      }
+
+      // Set organization context for RLS policies
+      await supabase.rpc('set_organization_context', {
+        p_organization_id: organizationId
+      });
+
       const { data, error } = await supabase
         .from('elections')
         .select(`
@@ -158,6 +207,22 @@ export const electionApi = {
       if (!organizationId || organizationId.trim() === '') {
         return [];
       }
+
+      // Get current user from localStorage to set context
+      const userDataStr = localStorage.getItem('user_data');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        
+        // Set user context for RLS policies
+        await supabase.rpc('set_user_context', {
+          p_user_id: userData.id
+        });
+      }
+
+      // Set organization context for RLS policies
+      await supabase.rpc('set_organization_context', {
+        p_organization_id: organizationId
+      });
 
       const now = new Date().toISOString();
       const { data, error } = await supabase
@@ -197,6 +262,22 @@ export const electionApi = {
 
   async getPastElections(organizationId: string) {
     try {
+      // Get current user from localStorage to set context
+      const userDataStr = localStorage.getItem('user_data');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        
+        // Set user context for RLS policies
+        await supabase.rpc('set_user_context', {
+          p_user_id: userData.id
+        });
+      }
+
+      // Set organization context for RLS policies
+      await supabase.rpc('set_organization_context', {
+        p_organization_id: organizationId
+      });
+
       const now = new Date().toISOString();
       const { data: elections, error } = await supabase
         .from('elections')

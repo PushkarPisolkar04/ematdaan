@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,10 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Users, Mail, CheckCircle, Clock, XCircle, Download } from 'lucide-react';
+import { Upload, Users, Mail, CheckCircle, Clock, XCircle, Download, Plus, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { uploadStudentCSV, getInvitationStats, getOrganizationInvitations } from '@/lib/invitationSystem';
+import { invitationApi } from '@/lib/invitationApi';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface InvitationStats {
   total_invitations: number;
@@ -30,9 +32,19 @@ interface StudentInvitation {
   created_at: string;
 }
 
+// Helper function to validate email
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 const InvitationManager: React.FC = () => {
+  const navigate = useNavigate();
+  const { organization } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [manualInvitations, setManualInvitations] = useState<Array<{ email: string }>>([{ email: '' }]);
+  const [sendingManual, setSendingManual] = useState(false);
   const [stats, setStats] = useState<InvitationStats>({
     total_invitations: 0,
     used_invitations: 0,
@@ -43,26 +55,25 @@ const InvitationManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadInvitationData();
-  }, []);
+    if (organization?.id) {
+      loadInvitationData();
+    }
+  }, [organization]);
 
   const loadInvitationData = async () => {
     try {
       setLoading(true);
       
-      // Get current organization ID from localStorage
-      const organizationId = localStorage.getItem('organization_id');
-      
-      if (!organizationId) {
+      if (!organization?.id) {
         throw new Error('No organization ID found');
       }
       
       // Load stats
-      const invitationStats = await getInvitationStats(organizationId);
+      const invitationStats = await invitationApi.getInvitationStats(organization.id);
       setStats(invitationStats);
       
       // Load invitations
-      const orgInvitations = await getOrganizationInvitations(organizationId);
+      const orgInvitations = await invitationApi.getInvitations(organization.id);
       setInvitations(orgInvitations);
       
     } catch (error) {
@@ -103,14 +114,39 @@ const InvitationManager: React.FC = () => {
     try {
       setUploading(true);
       
-      // Get current organization ID from localStorage
-      const organizationId = localStorage.getItem('organization_id');
-      
-      if (!organizationId) {
+      if (!organization?.id) {
         throw new Error('No organization ID found');
       }
       
-      const result = await uploadStudentCSV(selectedFile, organizationId);
+      // Parse CSV file to extract emails
+      const csvText = await selectedFile.text();
+      const lines = csvText.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      // Find email column
+      const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));
+      if (emailIndex === -1) {
+        throw new Error('No email column found in CSV');
+      }
+      
+      // Extract emails
+      const emails = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const email = values[emailIndex];
+        if (email && isValidEmail(email)) {
+          emails.push(email.toLowerCase());
+        }
+      }
+      
+      if (emails.length === 0) {
+        throw new Error('No valid emails found in CSV');
+      }
+      
+      const result = await invitationApi.createInvitations({
+        emails,
+        organizationId: organization.id
+      });
       
       if (result.success) {
         toast({
@@ -138,11 +174,79 @@ const InvitationManager: React.FC = () => {
     }
   };
 
+  const addManualInvitationRow = () => {
+    setManualInvitations([...manualInvitations, { email: '' }]);
+  };
+
+  const removeManualInvitationRow = (index: number) => {
+    if (manualInvitations.length > 1) {
+      setManualInvitations(manualInvitations.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateManualInvitation = (index: number, value: string) => {
+    const updated = [...manualInvitations];
+    updated[index].email = value;
+    setManualInvitations(updated);
+  };
+
+  const handleManualInvitations = async () => {
+    // Filter out empty rows
+    const validInvitations = manualInvitations.filter(inv => inv.email.trim());
+    
+    if (validInvitations.length === 0) {
+      toast({
+        title: "No Valid Invitations",
+        description: "Please add at least one valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setSendingManual(true);
+      
+      if (!organization?.id) {
+        throw new Error('No organization ID found');
+      }
+
+      // Extract emails from manual invitations
+      const emails = validInvitations.map(inv => inv.email.trim());
+      
+      const result = await invitationApi.createInvitations({
+        emails,
+        organizationId: organization.id
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Invitations Sent",
+          description: `${result.count} invitations sent successfully`,
+        });
+        
+        // Reload data
+        await loadInvitationData();
+        
+        // Reset form
+        setManualInvitations([{ email: '' }]);
+      }
+    } catch (error) {
+      console.error('Error sending manual invitations:', error);
+      toast({
+        title: "Failed to Send Invitations",
+        description: error instanceof Error ? error.message : "Failed to send invitations",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingManual(false);
+    }
+  };
+
   const downloadSampleCSV = () => {
-    const csvContent = `email,name,department
-student1@college.edu,John Doe,Computer Science
-student2@college.edu,Jane Smith,Mathematics
-student3@college.edu,Bob Johnson,Physics`;
+    const csvContent = `email
+student1@college.edu
+student2@college.edu
+student3@college.edu`;
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -172,63 +276,89 @@ student3@college.edu,Bob Johnson,Physics`;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Invitation Manager</h2>
-        <p className="text-muted-foreground">
-          Upload student list and send voting invitations
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pt-24 pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-6">
+          <Button
+            onClick={() => navigate('/admin')}
+            variant="ghost"
+            className="mb-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Admin
+          </Button>
+          
+          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-blue-100 p-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                Invitation Manager
+              </h1>
+              <p className="text-gray-600 text-sm">
+                Upload student list and send voting invitations
+              </p>
+            </div>
+          </div>
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Invitations</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-blue-200 shadow-md hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <CardTitle className="text-sm font-medium text-blue-800">Total Invitations</CardTitle>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_invitations}</div>
-            <p className="text-xs text-muted-foreground">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{stats.total_invitations}</div>
+            <p className="text-xs text-blue-600">
               Invitations sent
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Used Invitations</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+        <Card className="border-green-200 shadow-md hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100">
+            <CardTitle className="text-sm font-medium text-green-800">Used Invitations</CardTitle>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">{stats.used_invitations}</div>
-            <p className="text-xs text-muted-foreground">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">{stats.used_invitations}</div>
+            <p className="text-xs text-green-600">
               Students registered
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Invitations</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
+        <Card className="border-yellow-200 shadow-md hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-yellow-100">
+            <CardTitle className="text-sm font-medium text-yellow-800">Pending Invitations</CardTitle>
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{stats.pending_invitations}</div>
-            <p className="text-xs text-muted-foreground">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-yellow-600">{stats.pending_invitations}</div>
+            <p className="text-xs text-yellow-600">
               Awaiting registration
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expired Invitations</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
+        <Card className="border-red-200 shadow-md hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-pink-50 border-b border-red-100">
+            <CardTitle className="text-sm font-medium text-red-800">Expired Invitations</CardTitle>
+            <div className="p-2 bg-red-100 rounded-lg">
+              <XCircle className="h-4 w-4 text-red-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">{stats.expired_invitations}</div>
-            <p className="text-xs text-muted-foreground">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">{stats.expired_invitations}</div>
+            <p className="text-xs text-red-600">
               Expired links
             </p>
           </CardContent>
@@ -236,20 +366,21 @@ student3@college.edu,Bob Johnson,Physics`;
       </div>
 
       <Tabs defaultValue="upload" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="upload">Upload Students</TabsTrigger>
-          <TabsTrigger value="invitations">Manage Invitations</TabsTrigger>
+        <TabsList className="bg-white border border-blue-200 shadow-sm">
+          <TabsTrigger value="upload" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Upload Students</TabsTrigger>
+          <TabsTrigger value="manual" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Manual Add</TabsTrigger>
+          <TabsTrigger value="invitations" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Manage Invitations</TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Student List</CardTitle>
-              <CardDescription>
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+              <CardTitle className="text-blue-800 font-semibold">Upload Student List</CardTitle>
+              <CardDescription className="text-blue-700">
                 Upload a CSV file with student emails to send voting invitations
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-6">
               <div className="space-y-2">
                 <Label htmlFor="csv-upload">Select CSV File</Label>
                 <Input
@@ -258,14 +389,15 @@ student3@college.edu,Bob Johnson,Physics`;
                   accept=".csv"
                   onChange={handleFileSelect}
                   disabled={uploading}
+                  className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
                 />
                 <p className="text-sm text-muted-foreground">
-                  CSV should contain an "email" column with student email addresses
+                  CSV should contain an "email" column with student email addresses. Only email addresses are required.
                 </p>
               </div>
 
               <div className="flex items-center space-x-2">
-                <Button onClick={downloadSampleCSV} variant="outline" size="sm">
+                <Button onClick={downloadSampleCSV} variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50">
                   <Download className="h-4 w-4 mr-2" />
                   Download Sample CSV
                 </Button>
@@ -282,7 +414,7 @@ student3@college.edu,Bob Johnson,Physics`;
               <Button 
                 onClick={handleUpload} 
                 disabled={!selectedFile || uploading}
-                className="w-full"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {uploading ? 'Uploading...' : 'Upload and Send Invitations'}
@@ -291,15 +423,79 @@ student3@college.edu,Bob Johnson,Physics`;
           </Card>
         </TabsContent>
 
+        <TabsContent value="manual" className="space-y-4">
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+              <CardTitle className="text-blue-800 font-semibold">Add Students Manually</CardTitle>
+              <CardDescription className="text-blue-700">
+                Add individual students by entering their email addresses
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 p-6">
+              {manualInvitations.map((invitation, index) => (
+                <div key={index} className="flex items-center space-x-2 p-3 border border-blue-200 rounded-lg bg-blue-50">
+                  <div className="flex-1">
+                    <Label htmlFor={`email-${index}`} className="text-blue-700 font-medium">Email</Label>
+                                          <Input
+                        id={`email-${index}`}
+                        type="email"
+                        placeholder="student@example.com"
+                        value={invitation.email}
+                        onChange={(e) => updateManualInvitation(index, e.target.value)}
+                        className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                  </div>
+                  {manualInvitations.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeManualInvitationRow(index)}
+                      className="mt-6"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              <Button
+                variant="outline"
+                onClick={addManualInvitationRow}
+                className="w-full border-blue-200 text-blue-600 hover:bg-blue-50"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Student
+              </Button>
+
+              <Alert>
+                <Mail className="h-4 w-4" />
+                <AlertDescription>
+                  Invitation emails will be sent automatically to all students you add. 
+                  Each student will receive a unique invitation link that can only be used once.
+                </AlertDescription>
+              </Alert>
+
+                            <Button
+                onClick={handleManualInvitations}
+                disabled={sendingManual || manualInvitations.every(inv => !inv.email.trim())}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {sendingManual ? 'Sending Invitations...' : 'Send Invitations'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="invitations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invitation List</CardTitle>
-              <CardDescription>
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+              <CardTitle className="text-blue-800 font-semibold">Invitation List</CardTitle>
+              <CardDescription className="text-blue-700">
                 View and manage all sent invitations
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -337,15 +533,19 @@ student3@college.edu,Bob Johnson,Physics`;
               </Table>
               
               {invitations.length === 0 && (
-                <div className="text-center py-8">
-                  <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No invitations sent yet</p>
+                <div className="text-center py-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                  <div className="p-3 bg-blue-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <Mail className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <p className="text-blue-600 font-medium">No invitations sent yet</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+        </div>
+      </div>
     </div>
   );
 };

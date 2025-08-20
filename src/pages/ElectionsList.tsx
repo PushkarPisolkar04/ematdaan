@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { electionApi } from '@/lib/supabase';
+import { electionApi } from '@/lib/electionApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,7 @@ const ElectionsList: React.FC = () => {
           return;
         }
 
-        const data = await electionApi.getSchedule(organization.id);
+        const data = await electionApi.getElections(organization.id);
         setElections(data || []);
       } catch (error) {
         console.error('Failed to fetch elections:', error);

@@ -4,8 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { invitationApi } from '@/lib/invitationApi';
+import { CheckCircle, AlertCircle, Mail } from 'lucide-react';
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -21,6 +25,8 @@ const Login = () => {
 
   // Form data
   const [invitationToken, setInvitationToken] = useState('');
+  const [invitationValidation, setInvitationValidation] = useState<any>(null);
+  const [validatingInvitation, setValidatingInvitation] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -45,12 +51,45 @@ const Login = () => {
     const tab = searchParams.get('tab');
     
     if (token) {
-      setInvitationToken(token);
+      // Decode the token and fix spaces to + characters
+      const decodedToken = decodeURIComponent(token).replace(/ /g, '+');
+      setInvitationToken(decodedToken);
       setActiveTab('join');
+      validateInvitation(decodedToken);
     } else if (tab) {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  const validateInvitation = async (token: string) => {
+    if (!token.trim()) {
+      setInvitationValidation(null);
+      return;
+    }
+
+    console.log('Validating invitation token:', token);
+    console.log('Token length:', token.length);
+
+    try {
+      setValidatingInvitation(true);
+      const validation = await invitationApi.validateInvitationToken(token);
+      console.log('Validation result:', validation);
+      setInvitationValidation(validation);
+      
+      if (validation.is_valid) {
+        // Auto-fill the email field with the invitation email
+        setJoinData(prev => ({ ...prev, email: validation.email }));
+      }
+    } catch (error) {
+      console.error('Error validating invitation:', error);
+      setInvitationValidation({
+        is_valid: false,
+        reason: 'Failed to validate invitation'
+      });
+    } finally {
+      setValidatingInvitation(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +240,15 @@ const Login = () => {
       return;
     }
 
+    if (!invitationValidation?.is_valid) {
+      toast({
+        title: "Invalid Invitation",
+        description: "Please provide a valid invitation token",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (joinData.password !== joinData.confirmPassword) {
       toast({
         title: "Passwords Don't Match",
@@ -286,18 +334,50 @@ const Login = () => {
                   {/* Join Organization Tab */}
                   <TabsContent value="join" className="space-y-3 mt-3">
                     <form onSubmit={handleJoinOrganization} className="space-y-2">
-                      <div className="space-y-1">
-                        <label htmlFor="invitation-token" className="text-sm font-semibold text-gray-700">Invitation Token</label>
-                      <Input
+                                            <div className="space-y-1">
+                        <label htmlFor="invitation-token" className="text-sm font-semibold text-gray-700">
+                          Invitation Token
+                          {searchParams.get('invitation') && (
+                            <Badge variant="secondary" className="ml-2 text-xs bg-blue-100 text-blue-700">
+                              From Link
+                            </Badge>
+                          )}
+                        </label>
+                        <Input
                           id="invitation-token"
-                        type="text"
+                          type="text"
                           placeholder="Enter invitation token"
                           value={invitationToken}
-                          onChange={(e) => setInvitationToken(e.target.value)}
+                          onChange={(e) => {
+                            setInvitationToken(e.target.value);
+                            validateInvitation(e.target.value);
+                          }}
                           className="h-9 text-sm"
-                        required
-                      />
-                    </div>
+                          required
+                        />
+                        {validatingInvitation && (
+                          <p className="text-xs text-blue-600">Validating invitation...</p>
+                        )}
+                        {invitationValidation && (
+                          <div className="mt-2">
+                            {invitationValidation.is_valid ? (
+                              <Alert className="border-green-200 bg-green-50">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <AlertDescription className="text-green-700">
+                                  Valid invitation for <strong>{invitationValidation.email}</strong>
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <Alert className="border-red-200 bg-red-50">
+                                <AlertCircle className="h-4 w-4 text-red-600" />
+                                <AlertDescription className="text-red-700">
+                                  {invitationValidation.reason}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <div className="space-y-1">
                         <label htmlFor="join-name" className="text-sm font-semibold text-gray-700">Full Name</label>
                       <Input
@@ -310,18 +390,32 @@ const Login = () => {
                         required
                       />
                     </div>
-                      <div className="space-y-1">
-                        <label htmlFor="join-email" className="text-sm font-semibold text-gray-700">Email</label>
-                      <Input
+                                            <div className="space-y-1">
+                        <label htmlFor="join-email" className="text-sm font-semibold text-gray-700">
+                          Email
+                          {invitationValidation?.is_valid && (
+                            <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-700">
+                              <Mail className="h-3 w-3 mr-1" />
+                              From Invitation
+                            </Badge>
+                          )}
+                        </label>
+                        <Input
                           id="join-email"
-                        type="email"
-                        placeholder="Enter your email"
+                          type="email"
+                          placeholder={invitationValidation?.is_valid ? "Email from invitation" : "Enter your email"}
                           value={joinData.email}
                           onChange={(e) => setJoinData({ ...joinData, email: e.target.value })}
-                          className="h-9 text-sm"
-                        required
-                      />
-                    </div>
+                          className={`h-9 text-sm ${invitationValidation?.is_valid ? 'bg-gray-50 border-gray-300 text-gray-600' : ''}`}
+                          disabled={invitationValidation?.is_valid}
+                          required
+                        />
+                        {invitationValidation?.is_valid && (
+                          <p className="text-xs text-gray-500">
+                            Email is locked to the invitation address for security
+                          </p>
+                        )}
+                      </div>
                       <div className="space-y-1">
                         <label htmlFor="join-password" className="text-sm font-semibold text-gray-700">Password</label>
                       <Input

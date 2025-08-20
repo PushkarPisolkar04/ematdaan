@@ -33,16 +33,7 @@ DROP FUNCTION IF EXISTS has_user_voted(UUID, UUID) CASCADE;
 DROP FUNCTION IF EXISTS create_user_session(UUID, UUID, INET, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS invalidate_session(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS log_audit_event(UUID, UUID, TEXT, JSONB) CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_sessions() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_tokens() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_otps() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_mfa() CASCADE;
-DROP FUNCTION IF EXISTS run_all_cleanup_operations() CASCADE;
-DROP FUNCTION IF EXISTS auto_cleanup_expired() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_tokens() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_otps() CASCADE;
-DROP FUNCTION IF EXISTS cleanup_expired_mfa() CASCADE;
-DROP FUNCTION IF EXISTS run_all_cleanup_operations() CASCADE;
+-- Cleanup function drops removed - functions not needed
 
 DROP FUNCTION IF EXISTS set_organization_context(UUID) CASCADE;
 DROP FUNCTION IF EXISTS set_user_context(UUID) CASCADE;
@@ -50,6 +41,107 @@ DROP FUNCTION IF EXISTS generate_access_code() CASCADE;
 DROP FUNCTION IF EXISTS validate_access_token(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS logout_user_session(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
+
+-- Drop all existing policies
+-- Organizations policies
+DROP POLICY IF EXISTS "organizations_service_create" ON organizations;
+DROP POLICY IF EXISTS "organizations_service_read" ON organizations;
+DROP POLICY IF EXISTS "organizations_service_update" ON organizations;
+DROP POLICY IF EXISTS "organizations_anon_create" ON organizations;
+DROP POLICY IF EXISTS "organizations_anon_read" ON organizations;
+DROP POLICY IF EXISTS "organizations_read_own" ON organizations;
+DROP POLICY IF EXISTS "organizations_admin_update" ON organizations;
+
+-- Auth users policies
+DROP POLICY IF EXISTS "auth_users_service_create" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_service_read" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_service_update" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_anon_create" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_anon_read" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_read_own" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_update_own" ON auth_users;
+DROP POLICY IF EXISTS "auth_users_admin_read" ON auth_users;
+
+-- User organizations policies
+DROP POLICY IF EXISTS "user_organizations_service_create" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_service_read" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_service_update" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_anon_create" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_anon_read" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_read_own" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_admin_read" ON user_organizations;
+DROP POLICY IF EXISTS "user_organizations_admin_manage" ON user_organizations;
+
+-- Elections policies
+DROP POLICY IF EXISTS "elections_service_manage" ON elections;
+DROP POLICY IF EXISTS "elections_read_org" ON elections;
+DROP POLICY IF EXISTS "elections_admin_manage" ON elections;
+DROP POLICY IF EXISTS "elections_authenticated_create" ON elections;
+DROP POLICY IF EXISTS "elections_temp_create" ON elections;
+
+-- Candidates policies
+DROP POLICY IF EXISTS "candidates_service_manage" ON candidates;
+DROP POLICY IF EXISTS "candidates_read_org" ON candidates;
+DROP POLICY IF EXISTS "candidates_admin_manage" ON candidates;
+
+-- Votes policies
+DROP POLICY IF EXISTS "votes_service_manage" ON votes;
+DROP POLICY IF EXISTS "votes_read_own" ON votes;
+DROP POLICY IF EXISTS "votes_insert_own" ON votes;
+DROP POLICY IF EXISTS "votes_admin_read" ON votes;
+
+-- Encrypted votes policies
+DROP POLICY IF EXISTS "encrypted_votes_service_manage" ON encrypted_votes;
+DROP POLICY IF EXISTS "encrypted_votes_read_own" ON encrypted_votes;
+DROP POLICY IF EXISTS "encrypted_votes_insert_own" ON encrypted_votes;
+DROP POLICY IF EXISTS "encrypted_votes_admin_read" ON encrypted_votes;
+
+-- Merkle trees policies
+DROP POLICY IF EXISTS "merkle_trees_service_manage" ON merkle_trees;
+DROP POLICY IF EXISTS "merkle_trees_read_org" ON merkle_trees;
+DROP POLICY IF EXISTS "merkle_trees_admin_manage" ON merkle_trees;
+
+-- ZK proofs policies
+DROP POLICY IF EXISTS "zk_proofs_service_manage" ON zk_proofs;
+DROP POLICY IF EXISTS "zk_proofs_read_own" ON zk_proofs;
+DROP POLICY IF EXISTS "zk_proofs_insert_own" ON zk_proofs;
+DROP POLICY IF EXISTS "zk_proofs_admin_read" ON zk_proofs;
+
+-- Vote verifications policies
+DROP POLICY IF EXISTS "vote_verifications_service_manage" ON vote_verifications;
+DROP POLICY IF EXISTS "vote_verifications_read_own" ON vote_verifications;
+DROP POLICY IF EXISTS "vote_verifications_insert_own" ON vote_verifications;
+DROP POLICY IF EXISTS "vote_verifications_admin_read" ON vote_verifications;
+
+-- MFA tokens policies
+DROP POLICY IF EXISTS "mfa_tokens_service_manage" ON mfa_tokens;
+DROP POLICY IF EXISTS "mfa_tokens_read_own" ON mfa_tokens;
+DROP POLICY IF EXISTS "mfa_tokens_insert_own" ON mfa_tokens;
+
+-- User sessions policies
+DROP POLICY IF EXISTS "user_sessions_service_manage" ON user_sessions;
+DROP POLICY IF EXISTS "user_sessions_anon_create" ON user_sessions;
+DROP POLICY IF EXISTS "user_sessions_anon_read" ON user_sessions;
+DROP POLICY IF EXISTS "sessions_read_own" ON user_sessions;
+DROP POLICY IF EXISTS "sessions_insert_own" ON user_sessions;
+DROP POLICY IF EXISTS "sessions_update_own" ON user_sessions;
+
+-- OTPs policies
+DROP POLICY IF EXISTS "otps_validate" ON otps;
+DROP POLICY IF EXISTS "otps_anon_create" ON otps;
+DROP POLICY IF EXISTS "otps_anon_update" ON otps;
+DROP POLICY IF EXISTS "otps_service_manage" ON otps;
+
+-- Access tokens policies
+DROP POLICY IF EXISTS "access_tokens_validate" ON access_tokens;
+DROP POLICY IF EXISTS "access_tokens_service_manage" ON access_tokens;
+DROP POLICY IF EXISTS "access_tokens_admin_manage" ON access_tokens;
+
+-- Audit logs policies
+DROP POLICY IF EXISTS "audit_logs_service_manage" ON audit_logs;
+DROP POLICY IF EXISTS "audit_logs_read_own" ON audit_logs;
+DROP POLICY IF EXISTS "audit_logs_admin_read" ON audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert" ON audit_logs;
 
 -- =====================================================
 -- STEP 2: CREATE NEW TABLES
@@ -534,91 +626,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- COMPLETE CLEANUP SYSTEM
 -- =====================================================
 
--- Cleanup expired sessions
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM user_sessions 
-    WHERE expires_at < NOW() OR is_active = false;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Cleanup expired access tokens
-CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM access_tokens 
-    WHERE expires_at < NOW() OR is_active = false;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Cleanup expired OTPs
-CREATE OR REPLACE FUNCTION cleanup_expired_otps()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM otps 
-    WHERE expires_at < NOW() OR is_verified = true;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Cleanup expired MFA tokens
-CREATE OR REPLACE FUNCTION cleanup_expired_mfa()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM mfa_tokens 
-    WHERE expires_at < NOW() OR used = true;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Master cleanup function - runs all cleanup operations
-CREATE OR REPLACE FUNCTION run_all_cleanup_operations()
-RETURNS JSONB AS $$
-DECLARE
-    sessions_cleaned INTEGER;
-    tokens_cleaned INTEGER;
-    otps_cleaned INTEGER;
-    mfa_cleaned INTEGER;
-    total_cleaned INTEGER;
-BEGIN
-    -- Run all cleanup operations
-    SELECT cleanup_expired_sessions() INTO sessions_cleaned;
-    SELECT cleanup_expired_tokens() INTO tokens_cleaned;
-    SELECT cleanup_expired_otps() INTO otps_cleaned;
-    SELECT cleanup_expired_mfa() INTO mfa_cleaned;
-    
-    total_cleaned := sessions_cleaned + tokens_cleaned + otps_cleaned + mfa_cleaned;
-    
-    RETURN jsonb_build_object(
-        'success', true,
-        'total_cleaned', total_cleaned,
-        'sessions_cleaned', sessions_cleaned,
-        'tokens_cleaned', tokens_cleaned,
-        'otps_cleaned', otps_cleaned,
-        'mfa_cleaned', mfa_cleaned,
-        'timestamp', NOW()
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Cleanup functions removed - not needed for remote Supabase deployment
 
 
 
@@ -794,6 +802,11 @@ CREATE POLICY "user_organizations_admin_manage" ON user_organizations
         SELECT organization_id FROM user_organizations 
         WHERE user_id = current_setting('app.user_id')::uuid 
         AND role = 'admin'
+    ))
+    WITH CHECK (organization_id IN (
+        SELECT organization_id FROM user_organizations 
+        WHERE user_id = current_setting('app.user_id')::uuid 
+        AND role = 'admin'
     ));
 
 -- ELECTIONS
@@ -817,7 +830,25 @@ CREATE POLICY "elections_admin_manage" ON elections
         SELECT organization_id FROM user_organizations 
         WHERE user_id = current_setting('app.user_id')::uuid 
         AND role = 'admin'
+    ))
+    WITH CHECK (organization_id IN (
+        SELECT organization_id FROM user_organizations 
+        WHERE user_id = current_setting('app.user_id')::uuid 
+        AND role = 'admin'
     ));
+
+-- Allow authenticated users to create elections in their organization (for testing)
+CREATE POLICY "elections_authenticated_create" ON elections
+    FOR INSERT TO authenticated
+    WITH CHECK (organization_id IN (
+        SELECT organization_id FROM user_organizations 
+        WHERE user_id = current_setting('app.user_id')::uuid
+    ));
+
+-- Temporary policy to allow any authenticated user to create elections (for debugging)
+CREATE POLICY "elections_temp_create" ON elections
+    FOR INSERT TO authenticated
+    WITH CHECK (true);
 
 -- CANDIDATES
 -- Allow service role to manage candidates
@@ -838,6 +869,12 @@ CREATE POLICY "candidates_read_org" ON candidates
 CREATE POLICY "candidates_admin_manage" ON candidates
     FOR ALL TO authenticated
     USING (election_id IN (
+        SELECT e.id FROM elections e
+        JOIN user_organizations uo ON e.organization_id = uo.organization_id
+        WHERE uo.user_id = current_setting('app.user_id')::uuid 
+        AND uo.role = 'admin'
+    ))
+    WITH CHECK (election_id IN (
         SELECT e.id FROM elections e
         JOIN user_organizations uo ON e.organization_id = uo.organization_id
         WHERE uo.user_id = current_setting('app.user_id')::uuid 

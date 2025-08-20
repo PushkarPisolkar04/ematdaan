@@ -90,7 +90,9 @@ const sendInvitationEmails = async (invitations: any[]) => {
 export const generateInvitationLink = (token: string): string => {
   // Use environment variable for production URL, fallback to current origin for development
   const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-  return `${baseUrl}/auth?invitation=${token}`;
+  // Properly encode the token to handle + characters
+  const encodedToken = encodeURIComponent(token);
+  return `${baseUrl}/auth?invitation=${encodedToken}`;
 };
 
 // Send invitation email

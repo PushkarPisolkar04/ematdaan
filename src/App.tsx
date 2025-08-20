@@ -15,6 +15,8 @@ import Results from '@/pages/Results';
 import Profile from '@/pages/Profile';
 
 import ElectionsList from '@/pages/ElectionsList';
+import Candidates from '@/pages/Candidates';
+import InvitationManager from '@/components/admin/InvitationManager';
 import NotFound from '@/pages/NotFound';
 
 function App() {
@@ -79,6 +81,18 @@ function App() {
             <Route path="/elections" element={
               <ProtectedRoute>
                 <ElectionsList />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/elections/:electionId/candidates" element={
+              <ProtectedRoute requiredRole="admin">
+                <Candidates />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/invitations" element={
+              <ProtectedRoute requiredRole="admin">
+                <InvitationManager />
               </ProtectedRoute>
             } />
             

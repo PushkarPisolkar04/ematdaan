@@ -4,6 +4,9 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import organizationsRouter from './api/organizations.js';
+import electionsRouter from './api/elections.js';
+import candidatesRouter from './api/candidates.js';
+import invitationsRouter from './api/invitations.js';
 
 // Load environment variables from the project root
 dotenv.config({ path: '.env' });
@@ -185,6 +188,15 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
 
 // Organizations routes
 app.use('/api/organizations', organizationsRouter);
+
+// Elections routes
+app.use('/api/elections', electionsRouter);
+
+// Candidates routes
+app.use('/api/candidates', candidatesRouter);
+
+// Invitations routes
+app.use('/api/invitations', invitationsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
