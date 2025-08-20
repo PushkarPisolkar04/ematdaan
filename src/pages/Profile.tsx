@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, votingApi } from '@/lib/supabase';
+import { electionApi } from '@/lib/electionApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
-  History, 
-  Download
+  History
 } from 'lucide-react';
 
 interface VoteHistory {
@@ -21,7 +21,7 @@ interface VoteHistory {
   election: {
     id: string;
     name: string;
-    description: string;
+    description?: string;
   };
   candidate: {
     id: string;
@@ -51,39 +51,56 @@ const Profile: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data: votes, error } = await supabase
-        .from('votes')
-        .select(`
-          id,
-          vote_hash,
-          created_at,
-          elections!inner(
-            id,
-            name,
-            description
-          ),
-          candidates!inner(
-            id,
-            name,
-            party
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Get all elections for the organization
+      const electionsData = await electionApi.getElections(organization?.id);
+      
+      // Check which elections the user has voted in
+      const voteHistory: VoteHistory[] = [];
+      
+      for (const election of electionsData || []) {
+        try {
+          const hasVoted = await votingApi.hasVoted(user.id, election.id);
+          if (hasVoted) {
+            // Get vote details using server API instead of direct Supabase query
+            try {
+              const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+              const response = await fetch(`${API_BASE_URL}/api/votes/user-vote/${user.id}/${election.id}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
 
-      if (error) {
-        throw error;
+              if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                  const vote = result.data;
+                  voteHistory.push({
+                    id: vote.id,
+                    vote_hash: vote.vote_hash,
+                    created_at: vote.created_at,
+                    election: election,
+                    candidate: {
+                      id: vote.candidate.id,
+                      name: vote.candidate.name,
+                      party: vote.candidate.party
+                    }
+                  });
+                }
+              }
+            } catch (voteError) {
+              console.error(`Failed to get vote details for election ${election.id}:`, voteError);
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to check voting status for election ${election.id}:`, error);
+        }
       }
 
-      const transformedVotes: VoteHistory[] = votes?.map(vote => ({
-        id: vote.id,
-        vote_hash: vote.vote_hash,
-        created_at: vote.created_at,
-        election: Array.isArray(vote.elections) ? vote.elections[0] : vote.elections,
-        candidate: Array.isArray(vote.candidates) ? vote.candidates[0] : vote.candidates
-      })) || [];
-
-      setVoteHistory(transformedVotes);
+      // Sort by creation date (most recent first)
+      voteHistory.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setVoteHistory(voteHistory);
     } catch (error) {
       console.error('Failed to load vote history:', error);
       toast({
@@ -94,36 +111,7 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleDownloadReceipt = (vote: VoteHistory) => {
-    const receiptData = `
-VOTE RECEIPT
-============
 
-Receipt ID: ${vote.vote_hash}
-Election: ${vote.election.name}
-Candidate: ${vote.candidate.name}
-${vote.candidate.party ? `Party: ${vote.candidate.party}` : ''}
-Vote Time: ${new Date(vote.created_at).toLocaleString()}
-
-This receipt serves as proof of your vote submission.
-Keep this receipt for your records.
-
-Generated on: ${new Date().toLocaleString()}
-    `.trim();
-
-    const blob = new Blob([receiptData], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `vote-receipt-${vote.vote_hash.slice(-8)}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Receipt Downloaded",
-      description: "Vote receipt has been downloaded successfully"
-    });
-  };
 
   if (!user || !organization) {
       return (
@@ -259,7 +247,7 @@ Generated on: ${new Date().toLocaleString()}
                     <span>Voting History</span>
                   </CardTitle>
                   <CardDescription className="text-base text-gray-600">
-                    View all your past votes and download receipts
+                    View all your past votes
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -290,28 +278,14 @@ Generated on: ${new Date().toLocaleString()}
                                 <p className="text-sm"><strong>Party:</strong> <span className="text-gray-900">{vote.candidate.party}</span></p>
                               )}
                               <p className="text-xs text-gray-500">
-                                <strong>Receipt ID:</strong> {vote.vote_hash.slice(-16)}...
+                                <strong>Vote ID:</strong> {vote.vote_hash.slice(-16)}...
                               </p>
                             </div>
                             
                             <div className="flex space-x-3">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => navigate(`/verify-vote/${vote.vote_hash}`)}
-                                className="h-9 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
-                              >
-                                Verify Vote
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleDownloadReceipt(vote)}
-                                className="h-9 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Receipt
-                              </Button>
+                              <Badge variant="outline" className="text-sm border-green-300 text-green-700 bg-green-50">
+                                Voted
+                              </Badge>
                             </div>
                           </div>
                         </div>
@@ -321,6 +295,8 @@ Generated on: ${new Date().toLocaleString()}
                 </CardContent>
               </Card>
             </TabsContent>
+
+
           </Tabs>
         )}
       </div>

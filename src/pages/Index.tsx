@@ -16,7 +16,7 @@ import { fetchTodayStats, fetchPlatformStats, PlatformStats } from "@/lib/api/st
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { electionApi } from "@/lib/electionApi";
-import { supabase } from "@/lib/supabase";
+import { supabase, votingApi } from "@/lib/supabase";
 
 interface Election {
   id: string;
@@ -181,9 +181,9 @@ const Index = () => {
                   </h1>
 
                   <p className="text-xl text-gray-700 mb-8 leading-relaxed max-w-2xl">
-                    Experience the most advanced voting platform with enterprise-grade security, 
-                    zero-knowledge proofs, and digital signatures. Your vote is protected by 
-                    cutting-edge cryptography and transparent verification systems.
+                    Experience the most advanced voting platform with enterprise-grade security 
+                    and digital signatures. Your vote is protected by cutting-edge cryptography 
+                    and transparent verification systems.
                   </p>
 
                   {/* CTA Buttons */}
@@ -216,10 +216,7 @@ const Index = () => {
                       <CheckCircle className="h-4 w-4 text-blue-600" />
                       <span>Verified Transparent</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-purple-600" />
-                      <span>Zero-Knowledge Proofs</span>
-                    </div>
+
                   </div>
                 </motion.div>
 

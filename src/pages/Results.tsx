@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, votingApi } from '@/lib/supabase';
 import { electionApi } from '@/lib/electionApi';
+import { candidateApi } from '@/lib/candidateApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { generateElectionResultsReport } from '@/lib/receipt';
-import { Loader2, Trophy, Download, Share2, Users, Vote, TrendingUp, AlertCircle } from 'lucide-react';
+
+import { Loader2, Trophy, Users, Vote, TrendingUp, AlertCircle } from 'lucide-react';
 
 interface Candidate {
   id: string;
@@ -77,53 +78,51 @@ const Results: React.FC = () => {
         throw new Error('Election not found');
       }
 
-      // Get candidates with vote counts
-      const { data: candidates, error: candidatesError } = await supabase
-        .from('candidates')
-        .select(`
-          id,
-          name,
-          party,
-          symbol
-        `)
-        .eq('election_id', electionId);
+      // Get candidates first using the API
+      let candidates;
+      try {
+        const candidatesData = await candidateApi.getCandidates(electionId);
+        candidates = candidatesData;
+      } catch (apiError) {
+        // Fallback to direct Supabase query
+        const { data: candidatesData, error: candidatesError } = await supabase
+          .from('candidates')
+          .select(`
+            id,
+            name,
+            party,
+            symbol
+          `)
+          .eq('election_id', electionId);
 
-      if (candidatesError) {
-        throw candidatesError;
+        if (candidatesError) {
+          throw candidatesError;
+        }
+        candidates = candidatesData;
       }
 
-      // Get vote counts for each candidate
-      const candidatesWithVotes = await Promise.all(
-        (candidates || []).map(async (candidate) => {
-          const { count: voteCount } = await supabase
-            .from('votes')
-            .select('*', { count: 'exact', head: true })
-            .eq('election_id', electionId)
-            .eq('candidate_id', candidate.id);
+      // Get vote results using server API
+      const voteResults = await votingApi.getVoteResults(electionId);
+      
+      // Combine candidates with vote counts - ensure all candidates are included
+      const candidatesWithVotes = candidates?.map(candidate => {
+        const voteResult = voteResults.find((result: any) => result.candidate.id === candidate.id);
+        return {
+          ...candidate,
+          vote_count: voteResult ? (voteResult as any).votes : 0
+        };
+      }) || [];
 
-          return {
-            ...candidate,
-            vote_count: voteCount || 0
-          };
-        })
-      );
+      // Calculate total votes
+      const totalVotes = voteResults.reduce((total: number, result: any) => total + (result as any).votes, 0);
 
-      // Get total votes
-      const { count: totalVotes, error: voteCountError } = await supabase
-        .from('votes')
-        .select('*', { count: 'exact', head: true })
-        .eq('election_id', electionId);
-
-      if (voteCountError) {
-        throw voteCountError;
-      }
-
-      // Get total eligible voters (organization members)
+      // Get total eligible voters (organization members excluding admins)
       const { count: totalEligibleVoters, error: votersError } = await supabase
         .from('user_organizations')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organization.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .neq('role', 'admin');
 
       if (votersError) {
         throw votersError;
@@ -168,89 +167,7 @@ const Results: React.FC = () => {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (!results) return;
 
-    try {
-      await generateElectionResultsReport({
-        election: results.election,
-        candidates: results.candidates.map(candidate => ({
-          id: candidate.id,
-          name: candidate.name,
-          party: candidate.party || 'Independent',
-          symbol: candidate.symbol || '',
-          vote_count: candidate.vote_count,
-          percentage: candidate.percentage
-        })),
-        totalVotes: results.totalVotes,
-        totalEligibleVoters: results.totalEligibleVoters,
-        participationRate: results.participationRate,
-        winner: winner ? {
-          id: winner.id,
-          name: winner.name,
-          party: winner.party || 'Independent',
-          vote_count: winner.vote_count,
-          percentage: winner.percentage
-        } : undefined
-      });
-
-      toast({
-        title: "PDF Report Generated",
-        description: "Election results report has been downloaded"
-      });
-    } catch (error) {
-      console.error('Failed to generate PDF report:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to generate PDF report. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleExportCSV = () => {
-    if (!results) return;
-
-    const csvContent = [
-      ['Candidate', 'Party', 'Votes', 'Percentage'],
-      ...results.candidates.map(candidate => [
-        candidate.name,
-        candidate.party || 'Independent',
-        candidate.vote_count.toString(),
-        `${candidate.percentage}%`
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${results.election.name}-results.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Export Successful",
-      description: "Results exported to CSV file"
-    });
-  };
-
-  const handleShare = () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      navigator.share({
-        title: `${results?.election.name} Results`,
-        text: `View the results for ${results?.election.name}`,
-        url: url
-      });
-    } else {
-      navigator.clipboard.writeText(url);
-      toast({
-        title: "Link Copied",
-        description: "Results page link copied to clipboard"
-      });
-    }
-  };
 
   if (loading) {
     return (
@@ -518,51 +435,6 @@ const Results: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Export Options */}
-            <Card className="bg-white border border-gray-200 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl text-gray-800">Export & Share</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-4">
-                  <Button 
-                    onClick={handleExportPDF} 
-                    variant="outline" 
-                    className="w-full h-12 text-base border-purple-300 text-purple-700 hover:bg-purple-50"
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download PDF
-                  </Button>
-                  <Button 
-                    onClick={handleExportCSV} 
-                    variant="outline" 
-                    className="w-full h-12 text-base border-purple-300 text-purple-700 hover:bg-purple-50"
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download CSV
-                  </Button>
-                  <Button 
-                    onClick={handleShare} 
-                    variant="outline" 
-                    className="w-full h-12 text-base border-purple-300 text-purple-700 hover:bg-purple-50"
-                  >
-                    <Share2 className="h-5 w-5 mr-2" />
-                    Share Results
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
-            <div className="space-y-4">
-              <Button 
-                onClick={() => navigate('/dashboard')} 
-                className="w-full h-12 text-base bg-purple-600 hover:bg-purple-700"
-              >
-                Return to Dashboard
-              </Button>
-            </div>
           </div>
         </div>
       </div>

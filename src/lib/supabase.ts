@@ -442,43 +442,23 @@ export const candidateApi = {
 export const votingApi = {
   async castVote(voteData: { candidateId: string; electionId: string; userId: string }) {
     try {
-      // Check if user has already voted in this election
-      const { data: existingVote, error: checkError } = await supabase
-        .from('votes')
-        .select('id')
-        .eq('user_id', voteData.userId)
-        .eq('election_id', voteData.electionId)
-        .single();
+      const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_BASE_URL}/api/votes/cast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(voteData),
+      });
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to cast vote');
       }
 
-      if (existingVote) {
-        throw new Error('You have already voted in this election');
-      }
-
-      // Create vote hash (in a real app, this would be more complex)
-      const voteHash = `${voteData.userId}-${voteData.electionId}-${Date.now()}`;
-
-      // Insert the vote
-      const { data, error } = await supabase
-        .from('votes')
-        .insert([{
-          candidate_id: voteData.candidateId,
-          user_id: voteData.userId,
-          election_id: voteData.electionId,
-          vote_hash: voteHash
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Vote casting error:', error);
-        throw new Error('Failed to cast vote. Please try again.');
-      }
-
-      return data;
+      const result = await response.json();
+      return result.data;
     } catch (error) {
       console.error('Failed to cast vote:', error);
       throw error;
@@ -487,57 +467,71 @@ export const votingApi = {
 
   async hasVoted(userId: string, electionId: string) {
     try {
-      const { data, error } = await supabase
-        .from('votes')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('election_id', electionId)
-        .single();
+      const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_BASE_URL}/api/votes/has-voted/${userId}/${electionId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to check voting status');
       }
 
-      return !!data;
+      const result = await response.json();
+      return result.hasVoted;
     } catch (error) {
       console.error('Failed to check vote status:', error);
       throw error;
     }
   },
 
-  async getVoteResults(electionId: string) {
+  async getBulkVotingStatus(userId: string, electionIds: string[]) {
     try {
-      const { data, error } = await supabase
-        .from('votes')
-        .select(`
-          candidate_id,
-          candidates (
-            id,
-            name,
-            party,
-            symbol
-          )
-        `)
-        .eq('election_id', electionId);
+      const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_BASE_URL}/api/votes/bulk-voting-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, electionIds }),
+      });
 
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to check bulk voting status');
       }
 
-      // Count votes per candidate
-      const voteCounts = data?.reduce((acc: any, vote) => {
-        const candidateId = vote.candidate_id;
-        if (!acc[candidateId]) {
-          acc[candidateId] = {
-            candidate: vote.candidates,
-            votes: 0
-          };
-        }
-        acc[candidateId].votes++;
-        return acc;
-      }, {});
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Failed to check bulk voting status:', error);
+      throw error;
+    }
+  },
 
-      return Object.values(voteCounts || {});
+  async getVoteResults(electionId: string) {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_BASE_URL}/api/votes/results/${electionId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get vote results');
+      }
+
+      const result = await response.json();
+      return result.data;
     } catch (error) {
       console.error('Failed to get vote results:', error);
       throw error;

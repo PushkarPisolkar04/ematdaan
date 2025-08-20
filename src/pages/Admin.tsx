@@ -42,7 +42,7 @@ import {
   Lock,
   Unlock
 } from 'lucide-react';
-import { supabase, candidateApi } from '@/lib/supabase';
+import { supabase, candidateApi, votingApi } from '@/lib/supabase';
 import { electionApi } from '@/lib/electionApi';
 
 
@@ -144,15 +144,18 @@ const Admin = () => {
       const electionsData = await electionApi.getElections(organization?.id);
       
       const processedElections = await Promise.all((electionsData || []).map(async (election) => {
-        // Get vote count for this election
-        const { count: totalVotes } = await supabase
-          .from('votes')
-          .select('id', { count: 'exact', head: true })
-          .eq('election_id', election.id);
+        // Get vote count for this election using server API
+        let totalVotes = 0;
+        try {
+          const voteResults = await votingApi.getVoteResults(election.id);
+          totalVotes = voteResults.reduce((total: number, result: any) => total + (result as any).votes, 0);
+        } catch (error) {
+          console.error(`Failed to get vote count for election ${election.id}:`, error);
+        }
 
         return {
           ...election,
-          total_votes: totalVotes || 0,
+          total_votes: totalVotes,
           candidates_count: election.candidates?.length || 0
         };
       }));

@@ -3,20 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase, votingApi } from '@/lib/supabase';
 import { electionApi } from '@/lib/electionApi';
-import {
-  Vote, 
-  CheckCircle, 
-  AlertCircle, 
-  Clock, 
-  Shield,
-  ArrowLeft,
-  Info,
-  Target
-} from 'lucide-react';
+import { candidateApi } from '@/lib/candidateApi';
 
 interface Election {
   id: string;
@@ -39,7 +38,7 @@ const VotePage = () => {
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -82,14 +81,25 @@ const VotePage = () => {
         throw new Error('Election not found');
       }
 
-      setElection(electionData);
+      // If candidates are not included in the election data, load them separately
+      if (!electionData.candidates || electionData.candidates.length === 0) {
+        try {
+          const candidatesData = await candidateApi.getCandidates(electionId);
+          electionData.candidates = candidatesData || [];
+        } catch (candidateError) {
+          console.error('Failed to load candidates separately:', candidateError);
+          electionData.candidates = [];
+        }
+      }
 
-      // Check if user has already voted - handle error gracefully
+      setElection(electionData);
+      
+      // Check if user has already voted in this election
       try {
-        const hasVotedResult = await votingApi.hasVoted(user?.id, electionId);
-        setHasVoted(hasVotedResult);
+        const hasVotedStatus = await votingApi.hasVoted(user.id, electionId);
+        setHasVoted(hasVotedStatus);
       } catch (voteCheckError) {
-        console.warn('Could not check vote status, assuming not voted:', voteCheckError);
+        console.error('Failed to check voting status:', voteCheckError);
         setHasVoted(false);
       }
 
@@ -109,6 +119,16 @@ const VotePage = () => {
   const handleVote = async () => {
     if (!selectedCandidate || !election || !user) return;
 
+    // Double-check if user has already voted
+    if (hasVoted) {
+      toast({
+        title: "Already Voted",
+        description: "You have already voted in this election",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setVoting(true);
 
@@ -124,12 +144,13 @@ const VotePage = () => {
         description: "Your vote has been successfully submitted"
       });
 
+      // Update voting status
       setHasVoted(true);
-      setShowConfirmation(false);
+      setShowConfirmationDialog(false);
 
       // Navigate back to dashboard after a short delay
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }, 2000);
 
     } catch (error) {
@@ -179,87 +200,75 @@ const VotePage = () => {
 
   if (!election) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Election Not Found</h2>
-          <p className="text-gray-600 mb-4">The election you're looking for doesn't exist or you don't have access to it.</p>
-          <Button onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center">
+              <span className="text-red-500 text-6xl">⚠️</span>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Election Not Found</h2>
+              <p className="text-gray-600 mb-4">The election you're looking for doesn't exist or you don't have access to it.</p>
+              <Button onClick={() => navigate('/dashboard')}>
+                ← Back to Dashboard
+              </Button>
+            </div>
+          </div>
     );
   }
 
   const electionStatus = getElectionStatus();
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-8">
           <Button 
-            variant="outline" 
+            variant="ghost" 
             onClick={() => navigate('/dashboard')}
-            className="mb-4"
+            className="mb-4 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            ← Back to Dashboard
           </Button>
           
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-purple-100 p-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{election.name}</h1>
-              <p className="text-gray-600">
+              <p className="text-lg text-gray-600">
                 {organization?.name} • {electionStatus.message}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant={electionStatus.status === 'active' ? 'default' : 'secondary'}>
+            <div className="flex items-center space-x-3">
+              <Badge className={`text-base px-4 py-2 ${
+                electionStatus.status === 'active' 
+                  ? 'bg-green-100 text-green-800 border-green-200' 
+                  : electionStatus.status === 'upcoming' 
+                  ? 'bg-blue-100 text-blue-800 border-blue-200'
+                  : 'bg-gray-100 text-gray-800 border-gray-200'
+              }`}>
                 {electionStatus.status === 'active' ? 'Active' : electionStatus.status === 'upcoming' ? 'Upcoming' : 'Ended'}
               </Badge>
             </div>
           </div>
         </div>
 
-        {/* Election Info */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Info className="h-5 w-5 mr-2" />
-              Election Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Election Info - Compact */}
+        <Card className="mb-6 bg-white border border-gray-200 shadow-sm">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-sm font-medium text-gray-600">Start Time</p>
-                <p className="text-lg">{new Date(election.start_time).toLocaleString()}</p>
+                <p className="font-medium text-gray-600 mb-1">Start</p>
+                <p className="text-gray-900">{new Date(election.start_time).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">End Time</p>
-                <p className="text-lg">{new Date(election.end_time).toLocaleString()}</p>
+                <p className="font-medium text-gray-600 mb-1">End</p>
+                <p className="text-gray-900">{new Date(election.end_time).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Candidates</p>
-                <p className="text-lg">{election.candidates?.length || 0} candidates</p>
+                <p className="font-medium text-gray-600 mb-1">Candidates</p>
+                <p className="text-gray-900">{election.candidates?.length || 0}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Your Status</p>
-                <p className="text-lg">
-                  {hasVoted ? (
-                    <span className="text-green-600 flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Already Voted
-                    </span>
-                  ) : (
-                    <span className="text-blue-600 flex items-center">
-                      <Vote className="h-4 w-4 mr-1" />
-                      Not Voted
-                    </span>
-                  )}
+                <p className="font-medium text-gray-600 mb-1">Status</p>
+                <p className={hasVoted ? "text-green-600" : "text-blue-600"}>
+                  {hasVoted ? "Voted" : "Not Voted"}
                 </p>
               </div>
             </div>
@@ -268,149 +277,179 @@ const VotePage = () => {
 
         {/* Voting Section */}
         {hasVoted ? (
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-6 text-center">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-green-800 mb-2">You Have Already Voted</h3>
-              <p className="text-green-700 mb-4">
+          <Card className="bg-green-50 border-green-200 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="p-4 bg-green-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                <span className="text-4xl">✓</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-green-800 mb-3">You Have Already Voted</h3>
+              <p className="text-lg text-green-700 mb-6">
                 Thank you for participating in this election. Your vote has been recorded.
               </p>
-              <Button onClick={() => navigate('/dashboard')}>
+              <Button onClick={() => navigate('/dashboard')} className="bg-green-600 hover:bg-green-700 h-12 px-6">
                 Back to Dashboard
               </Button>
             </CardContent>
           </Card>
         ) : !canVote() ? (
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="p-6 text-center">
-              <Clock className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-yellow-800 mb-2">Voting Not Available</h3>
-              <p className="text-yellow-700 mb-4">
+          <Card className="bg-yellow-50 border-yellow-200 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="p-4 bg-yellow-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                <span className="text-4xl">⏰</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-yellow-800 mb-3">Voting Not Available</h3>
+              <p className="text-lg text-yellow-700 mb-6">
                 {electionStatus.message}
               </p>
-              <Button onClick={() => navigate('/dashboard')}>
+              <Button onClick={() => navigate('/dashboard')} className="bg-yellow-600 hover:bg-yellow-700 h-12 px-6">
                 Back to Dashboard
               </Button>
             </CardContent>
           </Card>
         ) : (
           <>
-            {/* Candidate Selection */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Target className="h-5 w-5 mr-2" />
+            {/* Candidate Selection - Prominent */}
+            <Card className="mb-6 bg-white border-2 border-purple-200 shadow-lg">
+              <CardHeader className="pb-4 bg-purple-50 border-b border-purple-100">
+                <CardTitle className="text-2xl text-purple-900">
                   Select Your Candidate
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-lg text-purple-700">
                   Choose your preferred candidate. You can only vote once.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {election.candidates?.map((candidate) => (
-                    <Card 
-                      key={candidate.id}
-                      className={`cursor-pointer transition-all ${
-                        selectedCandidate === candidate.id 
-                          ? 'ring-2 ring-blue-500 bg-blue-50' 
-                          : 'hover:bg-gray-50'
-                      }`}
-                      onClick={() => setSelectedCandidate(candidate.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0">
-                            {selectedCandidate === candidate.id ? (
-                              <CheckCircle className="h-6 w-6 text-blue-600" />
-                            ) : (
-                              <div className="h-6 w-6 rounded-full border-2 border-gray-300" />
-                            )}
+              <CardContent className="pt-6">
+                {election.candidates && election.candidates.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {election.candidates.map((candidate, index) => (
+                      <Card 
+                        key={candidate.id}
+                        className="transition-all duration-300 hover:shadow-md border-gray-200"
+                      >
+                        <CardContent className="p-8">
+                          <div className="flex items-center space-x-6">
+                            <div className="flex-shrink-0">
+                              <div className="h-16 w-16 rounded-full border-3 border-gray-300 flex items-center justify-center bg-gray-100">
+                                <span className="text-2xl font-bold text-gray-700">{index + 1}</span>
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-2xl font-bold text-gray-900 mb-2">{candidate.name}</h3>
+                              {candidate.party && (
+                                <p className="text-lg text-gray-600 mb-2">{candidate.party}</p>
+                              )}
+                              {candidate.symbol && (
+                                <Badge variant="outline" className="text-base border-purple-200 text-purple-700 bg-purple-50 px-3 py-1">
+                                  {candidate.symbol}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex-shrink-0">
+                              <Button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCandidate(candidate.id);
+                                  setShowConfirmationDialog(true);
+                                }}
+                                className="bg-purple-600 hover:bg-purple-700 h-12 px-6 text-lg font-semibold text-white"
+                              >
+                                Vote Now
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900">{candidate.name}</h3>
-                            {candidate.party && (
-                              <p className="text-sm text-gray-600">{candidate.party}</p>
-                            )}
-                            {candidate.symbol && (
-                              <p className="text-sm text-gray-500">Symbol: {candidate.symbol}</p>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="p-6 bg-red-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+                      <span className="text-6xl">❌</span>
+                    </div>
+                    <h3 className="text-3xl font-bold text-red-900 mb-4">No Candidates Available</h3>
+                    <p className="text-xl text-red-700 mb-6">No candidates have been added to this election yet.</p>
+                    <p className="text-lg text-gray-600">Please contact your election administrator to add candidates.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Vote Confirmation */}
-            {selectedCandidate && (
-              <Card className="mb-8 bg-blue-50 border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-blue-800">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Confirm Your Vote
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4">
-                    <p className="text-blue-700 mb-2">
-                      You have selected: <strong>{election.candidates?.find(c => c.id === selectedCandidate)?.name}</strong>
-                    </p>
-                    <p className="text-sm text-blue-600">
-                      Please confirm your selection. Once submitted, your vote cannot be changed.
-                    </p>
+            {/* Vote Security Info - Compact */}
+            <Card className="bg-gray-50 border border-gray-200 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="text-sm font-medium text-gray-700">Vote Security</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                    <span>Encrypted & secure</span>
                   </div>
-                  <div className="flex space-x-3">
-                    <Button 
-                      onClick={handleVote}
-                      disabled={voting}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {voting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Submitting Vote...
-                        </>
-                      ) : (
-                        <>
-                          <Vote className="h-4 w-4 mr-2" />
-                          Submit Vote
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedCandidate(null)}
-                      disabled={voting}
-                    >
-                      Change Selection
-                    </Button>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                    <span>One vote per election</span>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Security Notice */}
-            <Card className="bg-gray-50 border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-3">
-                  <Shield className="h-5 w-5 text-gray-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Vote Security</h3>
-                    <ul className="text-sm text-gray-600 space-y-1">
-                      <li>• Your vote is encrypted and secure</li>
-                      <li>• You can only vote once per election</li>
-                      <li>• Your vote is anonymous and confidential</li>
-                      <li>• The system prevents double voting</li>
-                    </ul>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                    <span>Anonymous & confidential</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                    <span>Prevents double voting</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </>
         )}
+
+        {/* Vote Confirmation Dialog */}
+        <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
+          <DialogContent className="sm:max-w-md" title="Confirm Vote">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-green-900">
+                Confirm Your Vote
+              </DialogTitle>
+              <DialogDescription className="text-lg text-green-700 pt-4">
+                You have selected: <strong className="text-xl">{election.candidates?.find(c => c.id === selectedCandidate)?.name}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-base text-gray-600">
+                Please confirm your selection. Once submitted, your vote cannot be changed.
+              </p>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={handleVote}
+                disabled={voting}
+                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 h-12 px-6 text-lg font-semibold text-white border-2 border-purple-600"
+              >
+                {voting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Submitting Vote...
+                  </>
+                ) : (
+                  <>
+                    Submit Vote
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSelectedCandidate(null);
+                  setShowConfirmationDialog(false);
+                }}
+                disabled={voting}
+                className="w-full sm:w-auto h-12 px-6 text-lg font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

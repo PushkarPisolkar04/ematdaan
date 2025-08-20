@@ -17,13 +17,7 @@ const features = [
     color: "from-blue-500 to-blue-600",
     bgColor: "from-blue-50 to-blue-100",
   },
-  {
-    icon: CheckCircle,
-    title: "Zero-Knowledge Verification",
-    description: "Advanced cryptographic proofs validate votes without revealing choices.",
-    color: "from-teal-600 to-cyan-600",
-    bgColor: "from-teal-50 to-cyan-50",
-  },
+
   {
     icon: Eye,
     title: "Complete Transparency",

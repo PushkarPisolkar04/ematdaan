@@ -9,8 +9,6 @@ import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Admin from '@/pages/Admin';
 import Vote from '@/pages/Vote';
-import VerifyVote from '@/pages/VerifyVote';
-import VoteReceipt from '@/pages/VoteReceipt';
 import Results from '@/pages/Results';
 import Profile from '@/pages/Profile';
 
@@ -54,23 +52,7 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/verify-vote/:receipt" element={
-              <ProtectedRoute>
-                <VerifyVote />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/verify-vote" element={
-              <ProtectedRoute>
-                <VerifyVote />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/vote-receipt/:receiptId" element={
-              <ProtectedRoute>
-                <VoteReceipt />
-              </ProtectedRoute>
-            } />
+
             
             <Route path="/results/:electionId" element={
               <ProtectedRoute>

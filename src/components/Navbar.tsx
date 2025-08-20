@@ -99,7 +99,7 @@ export default function Navbar() {
   const authenticatedNavItems = [
     { label: "Home", href: "/", onClick: handleHomeClick },
     { label: "Elections", href: "/elections", onClick: () => setIsMenuOpen(false) },
-    { label: "Verify Vote", href: "/verify-vote", onClick: () => setIsMenuOpen(false) },
+    
     { label: "FAQs", href: "#faqs", onClick: handleFAQClick },
   ];
 

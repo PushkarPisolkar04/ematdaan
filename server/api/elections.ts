@@ -297,7 +297,15 @@ router.get('/:electionId', async (req, res) => {
 
     const { data: election, error } = await supabase
       .from('elections')
-      .select('*')
+      .select(`
+        *,
+        candidates (
+          id,
+          name,
+          party,
+          symbol
+        )
+      `)
       .eq('id', electionId)
       .single();
 

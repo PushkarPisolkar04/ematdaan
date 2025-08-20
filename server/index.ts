@@ -9,6 +9,7 @@ import candidatesRouter from './api/candidates';
 import invitationsRouter from './api/invitations';
 import authRouter from './api/auth';
 import statsRouter from './api/stats';
+import votesRouter from './api/votes';
 
 // Load environment variables from the project root
 dotenv.config({ path: '.env' });
@@ -205,6 +206,9 @@ app.use('/api/auth', authRouter);
 
 // Stats routes
 app.use('/api/stats', statsRouter);
+
+// Votes routes
+app.use('/api/votes', votesRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -5,7 +5,7 @@ const FAQSection = () => {
   const faqs = [
     {
       question: "How secure is the voting system?",
-      answer: "E-Matdaan uses military-grade AES-256 encryption, zero-knowledge proofs, and digital signatures to protect your vote. Each vote is encrypted before storage and can only be decrypted with proper authorization. Our Merkle tree system ensures vote integrity without compromising privacy."
+      answer: "E-Matdaan uses military-grade AES-256 encryption and digital signatures to protect your vote. Each vote is encrypted before storage and can only be decrypted with proper authorization. Our system ensures vote integrity and prevents tampering."
     },
     {
       question: "How do I create an organization?",
@@ -19,10 +19,7 @@ const FAQSection = () => {
       question: "Can I vote multiple times in the same election?",
       answer: "No, the system prevents double voting through sophisticated database checks and unique voter identification. Each user can only vote once per election, and this is enforced at both the application and database levels."
     },
-    {
-      question: "How can I verify that my vote was counted?",
-      answer: "After voting, you'll receive a digital receipt with a unique verification code and QR code. You can use this receipt on our verification portal to confirm your vote was recorded correctly and included in the final count without revealing your choice."
-    },
+
     {
       question: "What if I forget my password?",
       answer: "Please contact your organization administrator to reset your password. They have the ability to help you regain access to your account."
@@ -49,7 +46,7 @@ const FAQSection = () => {
     },
     {
       question: "How do I know the election results are accurate?",
-      answer: "Our system uses cryptographic proofs to ensure accuracy. Each vote is digitally signed and verified. The final count is mathematically provable, and you can verify your own vote was included. All election data is auditable while maintaining voter privacy."
+      answer: "Our system uses cryptographic proofs to ensure accuracy. Each vote is digitally signed and verified. The final count is mathematically provable, and all election data is auditable while maintaining voter privacy."
     }
   ];
 

@@ -25,20 +25,8 @@ const HowItWorks = () => {
       color: "text-purple-600",
       bgColor: "bg-purple-50"
     },
-    {
-      icon: <FileText className="h-8 w-8" />,
-      title: "Get Receipt",
-      description: "Receive a digital receipt with verification code and QR code.",
-      color: "text-red-600",
-      bgColor: "bg-red-50"
-    },
-    {
-      icon: <Eye className="h-8 w-8" />,
-      title: "Verify Vote",
-      description: "Use your receipt to verify your vote was counted correctly.",
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-50"
-    },
+
+
     {
       icon: <CheckCircle className="h-8 w-8" />,
       title: "View Results",
@@ -185,28 +173,12 @@ const HowItWorks = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="bg-purple-100 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                    <Lock className="h-8 w-8 text-purple-600" />
-                  </div>
-                  <h4 className="font-semibold mb-2">AES-256 Encryption</h4>
-                  <p className="text-sm text-gray-600">Bank-level encryption protects your vote</p>
+              <div className="text-center">
+                <div className="bg-purple-100 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <Lock className="h-8 w-8 text-purple-600" />
                 </div>
-                <div className="text-center">
-                  <div className="bg-indigo-100 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                    <Eye className="h-8 w-8 text-indigo-600" />
-                  </div>
-                  <h4 className="font-semibold mb-2">Zero-Knowledge Proofs</h4>
-                  <p className="text-sm text-gray-600">Verify votes without revealing choices</p>
-                </div>
-                <div className="text-center">
-                  <div className="bg-green-100 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                  <h4 className="font-semibold mb-2">Merkle Tree Verification</h4>
-                  <p className="text-sm text-gray-600">Mathematical proof of vote integrity</p>
-                </div>
+                <h4 className="font-semibold mb-2">AES-256 Encryption</h4>
+                <p className="text-sm text-gray-600">Bank-level encryption protects your vote</p>
               </div>
             </CardContent>
           </Card>

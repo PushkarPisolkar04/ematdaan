@@ -1,11 +1,7 @@
 import { supabase } from '@/lib/supabase';
-import { generateElectionKeys } from '@/lib/advancedSecurity';
 
 export const createElection = async (name: string, startTime: Date, endTime: Date) => {
   try {
-    // Generate encryption keys for the election
-    const keys = await generateElectionKeys();
-
     // Create election in database
     const { data: election, error } = await supabase
       .from('elections')
@@ -14,17 +10,7 @@ export const createElection = async (name: string, startTime: Date, endTime: Dat
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
         is_active: true,
-        total_votes: 0,
-        encryption_keys: {
-          publicKey: {
-            n: keys.publicKey.n,
-            e: keys.publicKey.e,
-          },
-          privateKey: {
-            n: keys.privateKey.n,
-            d: keys.privateKey.d,
-          },
-        }
+        total_votes: 0
       })
       .select()
       .single();
@@ -142,7 +128,7 @@ export const getElectionStats = async () => {
       totalVotes: totalVotes || 0,
       turnoutPercentage,
       candidates: election.candidates,
-      merkleRoot: election.merkle_root,
+
       electionPeriod: {
         start: election.start_time,
         end: election.end_time,
@@ -168,7 +154,7 @@ interface ElectionData {
   end_time: string;
   total_votes: number | null;
   total_registered: number | null;
-  merkle_root?: string;
+
   candidates: ElectionCandidate[];
 }
 
@@ -209,7 +195,7 @@ export const getPastElections = async () => {
             percentage: totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
           };
         }),
-        merkleRoot: election.merkle_root || '',
+
         electionPeriod: {
           start: election.start_time,
           end: election.end_time

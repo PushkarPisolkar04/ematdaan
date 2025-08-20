@@ -38,8 +38,7 @@ npm run dev:all
 
 ### 🔐 **Security**
 - End-to-end vote encryption
-- Zero-knowledge proofs for privacy
-- Merkle tree verification
+
 - Digital signatures
 - Row-level security
 
@@ -51,7 +50,7 @@ npm run dev:all
 
 ### 🗳️ **Voting System**
 - Real-time elections
-- Digital vote receipts
+
 - Vote verification
 - Audit logging
 - PDF reports
@@ -157,7 +156,7 @@ npm start
 1. **Organization Setup** - Create org, verify email, invite members
 2. **Election Creation** - Admin creates election with candidates
 3. **Voting Process** - Members vote securely with encryption
-4. **Results & Verification** - View results, verify votes, get receipts
+4. **Results & Verification** - View results and verify votes
 
 ---
 

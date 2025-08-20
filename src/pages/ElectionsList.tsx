@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { electionApi } from '@/lib/electionApi';
-import { supabase } from '@/lib/supabase';
+import { supabase, votingApi } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,16 +75,19 @@ const ElectionsList: React.FC = () => {
         // Enhance elections with additional data
         const enhancedElections = await Promise.all(
           (data || []).map(async (election) => {
-            // Get total votes
-            const { count: totalVotes } = await supabase
-              .from('votes')
-              .select('*', { count: 'exact', head: true })
-              .eq('election_id', election.id);
+            // Get total votes using server API
+            let totalVotes = 0;
+            try {
+              const voteResults = await votingApi.getVoteResults(election.id);
+              totalVotes = voteResults.reduce((total: number, result: any) => total + (result as any).votes, 0);
+            } catch (error) {
+              console.error(`Failed to get vote count for election ${election.id}:`, error);
+            }
 
             return {
               ...election,
               candidates_count: election.candidates?.length || 0,
-              total_votes: totalVotes || 0
+              total_votes: totalVotes
             };
           })
         );

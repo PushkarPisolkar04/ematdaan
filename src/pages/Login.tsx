@@ -630,22 +630,11 @@ const Login = () => {
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900 text-sm">Vote in Elections</h4>
-                  <p className="text-xs text-gray-600">Participate in secure, encrypted voting with verification receipts</p>
+                  <p className="text-xs text-gray-600">Participate in secure, encrypted voting</p>
                 </div>
               </div>
               
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 text-sm">Verify Your Vote</h4>
-                  <p className="text-xs text-gray-600">Use your receipt to confirm your vote was counted correctly</p>
-                </div>
-              </div>
+
               
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center">

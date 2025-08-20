@@ -20,7 +20,7 @@ import {
   HelpCircle,
   RefreshCw
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, votingApi } from '@/lib/supabase';
 import { fetchPlatformStats, PlatformStats } from '@/lib/api/stats';
 import { electionApi } from '@/lib/electionApi';
 
@@ -82,6 +82,18 @@ const Dashboard = () => {
     }
   }, [elections, platformStats]);
 
+  // Refresh data when component comes into focus (e.g., after voting)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAuthenticated && organization && user) {
+        loadDashboardData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated, organization, user]);
+
   const loadDashboardData = async () => {
     if (!user || !organization) return;
     
@@ -118,15 +130,20 @@ const Dashboard = () => {
       // Use the same API as admin dashboard
       const electionsData = await electionApi.getElections(organization?.id);
       
-      // Check which elections the user has voted in
-      const { data: userVotes, error: votesError } = await supabase
-        .from('votes')
-        .select('election_id')
-        .eq('user_id', user?.id);
-
-      if (votesError) throw votesError;
-
-      const votedElectionIds = new Set(userVotes?.map(vote => vote.election_id) || []);
+      // Check which elections the user has voted in using server API
+      const votedElectionIds = new Set();
+      
+      // Check voting status for each election
+      for (const election of electionsData || []) {
+        try {
+          const hasVoted = await votingApi.hasVoted(user.id, election.id);
+          if (hasVoted) {
+            votedElectionIds.add(election.id);
+          }
+        } catch (error) {
+          console.error(`Failed to check voting status for election ${election.id}:`, error);
+        }
+      }
 
       const processedElections = (electionsData || []).map(election => ({
         id: election.id,
