@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase, votingApi } from '@/lib/supabase';
+import { electionApi } from '@/lib/electionApi';
 import {
   Vote, 
   CheckCircle, 
@@ -23,7 +24,7 @@ interface Election {
   start_time: string;
   end_time: string;
   is_active: boolean;
-  candidates: Array<{
+  candidates?: Array<{
     id: string;
     name: string;
     party: string;
@@ -69,35 +70,28 @@ const VotePage = () => {
     try {
       setLoading(true);
 
-      // Load election data
-      const { data: electionData, error: electionError } = await supabase
-        .from('elections')
-        .select(`
-          *,
-          candidates (
-            id,
-            name,
-            party,
-            symbol
-          )
-        `)
-        .eq('id', electionId)
-        .eq('organization_id', organization.id)
-        .single();
-
-      if (electionError) {
-        throw new Error('Election not found');
-      }
+      // Load election data using the API
+      const electionData = await electionApi.getElection(electionId);
 
       if (!electionData) {
         throw new Error('Election not found');
       }
 
+      // Verify the election belongs to the user's organization
+      if (electionData.organization_id !== organization.id) {
+        throw new Error('Election not found');
+      }
+
       setElection(electionData);
 
-      // Check if user has already voted
-      const hasVotedResult = await votingApi.hasVoted(user?.id, electionId);
-      setHasVoted(hasVotedResult);
+      // Check if user has already voted - handle error gracefully
+      try {
+        const hasVotedResult = await votingApi.hasVoted(user?.id, electionId);
+        setHasVoted(hasVotedResult);
+      } catch (voteCheckError) {
+        console.warn('Could not check vote status, assuming not voted:', voteCheckError);
+        setHasVoted(false);
+      }
 
     } catch (error) {
       console.error('Failed to load election data:', error);

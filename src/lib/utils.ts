@@ -24,6 +24,40 @@ export function formatDateTime(date: Date | string): string {
   return `${formatDate(date)} at ${formatTime(date)}`;
 }
 
+export function formatTimeRemaining(startTime: string, endTime: string): string {
+  const now = new Date();
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  
+  let diff: number;
+  
+  if (now < start) {
+    // Election hasn't started yet
+    diff = start.getTime() - now.getTime();
+  } else if (now <= end) {
+    // Election is active
+    diff = end.getTime() - now.getTime();
+  } else {
+    // Election has ended
+    return 'Election ended';
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  
+  if (parts.length === 0) {
+    return 'Less than 1m';
+  }
+  
+  return parts.join(' ');
+}
+
 export function truncateAddress(address: string, length: number = 6): string {
   if (!address) return '';
   return `${address.slice(0, length)}...${address.slice(-length)}`;

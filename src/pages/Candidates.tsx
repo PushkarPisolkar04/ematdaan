@@ -269,14 +269,14 @@ const Candidates: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 pt-24 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <Button
             onClick={() => navigate('/admin')}
             variant="ghost"
-            className="mb-3 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+            className="mb-4 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Admin
@@ -284,11 +284,11 @@ const Candidates: React.FC = () => {
           
           <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-purple-100 p-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 Manage Candidates
               </h1>
               {election && (
-                <p className="text-gray-600 text-sm">
+                <p className="text-base text-gray-600">
                   Election: <span className="font-semibold text-purple-600">{election.name}</span>
                 </p>
               )}
@@ -296,7 +296,7 @@ const Candidates: React.FC = () => {
             
             <Button
               onClick={() => setIsAddingCandidate(true)}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg h-10 px-5"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Candidate
@@ -306,59 +306,59 @@ const Candidates: React.FC = () => {
 
         {/* Add Candidate Form */}
         {isAddingCandidate && (
-          <Card className="mb-6 border-purple-200 shadow-lg">
+          <Card className="mb-8 border-purple-200 shadow-lg">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
-              <CardTitle className="text-purple-800">Add New Candidate</CardTitle>
-              <CardDescription className="text-purple-600">
+              <CardTitle className="text-lg text-purple-800">Add New Candidate</CardTitle>
+              <CardDescription className="text-sm text-purple-600">
                 Enter the candidate's information
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <form onSubmit={handleAddCandidate} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <form onSubmit={handleAddCandidate} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label htmlFor="name" className="text-purple-700 font-medium">Name</Label>
+                    <Label htmlFor="name" className="text-sm text-purple-700 font-semibold">Name</Label>
                     <Input
                       id="name"
                       value={newCandidate.name}
                       onChange={(e) => setNewCandidate({ ...newCandidate, name: e.target.value })}
                       placeholder="Candidate name"
-                      className="border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                      className="h-10 border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="party" className="text-purple-700 font-medium">Party</Label>
+                    <Label htmlFor="party" className="text-sm text-purple-700 font-semibold">Party</Label>
                     <Input
                       id="party"
                       value={newCandidate.party}
                       onChange={(e) => setNewCandidate({ ...newCandidate, party: e.target.value })}
                       placeholder="Political party"
-                      className="border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                      className="h-10 border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="symbol" className="text-purple-700 font-medium">Symbol</Label>
+                    <Label htmlFor="symbol" className="text-sm text-purple-700 font-semibold">Symbol</Label>
                     <Input
                       id="symbol"
                       value={newCandidate.symbol}
                       onChange={(e) => setNewCandidate({ ...newCandidate, symbol: e.target.value })}
                       placeholder="Party symbol"
-                      className="border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                      className="h-10 border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
                       required
                     />
                   </div>
                 </div>
-                <div className="flex gap-3 pt-2">
-                  <Button type="submit" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
+                <div className="flex gap-4 pt-4">
+                  <Button type="submit" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white h-10 px-5">
                     Add Candidate
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddingCandidate(false)}
-                    className="border-purple-200 text-purple-600 hover:bg-purple-50"
+                    className="border-purple-200 text-purple-600 hover:bg-purple-50 h-10 px-5"
                   >
                     Cancel
                   </Button>
@@ -369,18 +369,18 @@ const Candidates: React.FC = () => {
         )}
 
         {/* Candidates List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {candidates.map((candidate) => (
-            <Card key={candidate.id} className="border-purple-200 shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-3">
+            <Card key={candidate.id} className="border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-lg">
-                      <User className="h-4 w-4 text-purple-600" />
+                      <User className="h-5 w-5 text-purple-600" />
                     </div>
                     <CardTitle className="text-lg text-gray-800">{candidate.name}</CardTitle>
                   </div>
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -402,36 +402,39 @@ const Candidates: React.FC = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 {editingCandidate === candidate.id ? (
-                  <form onSubmit={handleEditCandidate} className="space-y-3">
+                  <form onSubmit={handleEditCandidate} className="space-y-4">
                     <div>
-                      <Label htmlFor={`edit-name-${candidate.id}`}>Name</Label>
+                      <Label htmlFor={`edit-name-${candidate.id}`} className="text-xs font-semibold">Name</Label>
                       <Input
                         id={`edit-name-${candidate.id}`}
                         value={editForm.name}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="h-8 text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`edit-party-${candidate.id}`}>Party</Label>
+                      <Label htmlFor={`edit-party-${candidate.id}`} className="text-xs font-semibold">Party</Label>
                       <Input
                         id={`edit-party-${candidate.id}`}
                         value={editForm.party}
                         onChange={(e) => setEditForm({ ...editForm, party: e.target.value })}
+                        className="h-8 text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`edit-symbol-${candidate.id}`}>Symbol</Label>
+                      <Label htmlFor={`edit-symbol-${candidate.id}`} className="text-xs font-semibold">Symbol</Label>
                       <Input
                         id={`edit-symbol-${candidate.id}`}
                         value={editForm.symbol}
                         onChange={(e) => setEditForm({ ...editForm, symbol: e.target.value })}
+                        className="h-8 text-sm"
                         required
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" size="sm">
+                    <div className="flex gap-3">
+                      <Button type="submit" size="sm" className="bg-purple-600 hover:bg-purple-700 h-8 text-xs">
                         Save
                       </Button>
                       <Button
@@ -439,6 +442,7 @@ const Candidates: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={cancelEditing}
+                        className="h-8 text-xs"
                       >
                         Cancel
                       </Button>
@@ -450,10 +454,10 @@ const Candidates: React.FC = () => {
                       <div className="p-1.5 bg-blue-100 rounded-md">
                         <Vote className="h-3 w-3 text-blue-600" />
                       </div>
-                      <span className="font-medium text-gray-700 text-base">{candidate.party}</span>
+                      <span className="font-medium text-gray-700 text-sm">{candidate.party}</span>
                     </div>
                     <div>
-                      <Badge variant="secondary" className="bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200">
+                      <Badge variant="secondary" className="bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-purple-200 text-xs px-2 py-1">
                         {candidate.symbol}
                       </Badge>
                     </div>
@@ -470,12 +474,12 @@ const Candidates: React.FC = () => {
               <User className="h-10 w-10 text-purple-600" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Candidates Yet</h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-base text-gray-600 mb-6">
               Start by adding candidates to this election.
             </p>
             <Button
               onClick={() => setIsAddingCandidate(true)}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg h-10 px-6"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add First Candidate

@@ -140,187 +140,189 @@ Generated on: ${new Date().toLocaleString()}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-            {user.name?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
-            <p className="text-gray-600">{user.email}</p>
-            <div className="flex items-center space-x-2 mt-1">
-              <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className={userRole === 'admin' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}>
-                {userRole === 'admin' ? 'Administrator' : 'Student'}
-              </Badge>
-              <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">{organization.name}</Badge>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                {user.name?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{user.name}</h1>
+                <p className="text-lg text-gray-600 mb-3">{user.email}</p>
+                <div className="flex items-center space-x-3">
+                  <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className={`text-sm ${userRole === 'admin' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
+                    {userRole === 'admin' ? 'Administrator' : 'Student'}
+                  </Badge>
+                  <Badge variant="outline" className="text-sm border-purple-300 text-purple-700 bg-purple-50">{organization.name}</Badge>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {userRole === 'admin' ? (
-        // Admin view - no tabs, just show personal info
-        <div className="space-y-4">
-          <Card className="bg-white border border-purple-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center space-x-2 text-lg text-gray-800">
-                <User className="h-5 w-5 text-purple-600" />
-                <span>Personal Information</span>
-              </CardTitle>
-              <CardDescription className="text-sm text-gray-600">
-                Your account details and information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-gray-700">Full Name</h3>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-200">{user.name}</p>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-gray-700">Email Address</h3>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-200">{user.email}</p>
-                </div>
-              </div>
-
-              <Separator className="bg-purple-200" />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-sm text-gray-700">Organization</h3>
-                  <p className="text-sm text-gray-600">{organization.name}</p>
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm text-gray-700">Role</h3>
-                  <p className="text-sm text-gray-600">Administrator</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        // Student view - with tabs
-        <Tabs defaultValue="personal" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 bg-white border border-purple-200 shadow-sm">
-            <TabsTrigger value="personal" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Personal Info</TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Vote History</TabsTrigger>
-          </TabsList>
-
-          {/* Personal Information Tab */}
-          <TabsContent value="personal" className="space-y-4">
-            <Card className="bg-white border border-purple-200 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center space-x-2 text-lg text-gray-800">
-                  <User className="h-5 w-5 text-purple-600" />
+        {userRole === 'admin' ? (
+          // Admin view - no tabs, just show personal info
+          <div className="space-y-6">
+            <Card className="bg-white border border-gray-200 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl text-gray-800 flex items-center space-x-3">
+                  <User className="h-6 w-6 text-purple-600" />
                   <span>Personal Information</span>
                 </CardTitle>
-                <CardDescription className="text-sm text-gray-600">
+                <CardDescription className="text-base text-gray-600">
                   Your account details and information
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm text-gray-700">Full Name</h3>
-                    <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-200">{user.name}</p>
+              <CardContent className="pt-0 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-base text-gray-700">Full Name</h3>
+                    <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">{user.name}</p>
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm text-gray-700">Email Address</h3>
-                    <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-200">{user.email}</p>
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-base text-gray-700">Email Address</h3>
+                    <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">{user.email}</p>
                   </div>
                 </div>
 
-                <Separator className="bg-purple-200" />
+                <Separator className="bg-gray-200" />
 
-                <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="font-medium text-sm text-gray-700">Organization</h3>
-                    <p className="text-sm text-gray-600">{organization.name}</p>
+                    <h3 className="font-semibold text-base text-gray-700 mb-2">Organization</h3>
+                    <p className="text-lg text-gray-900">{organization.name}</p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-sm text-gray-700">Role</h3>
-                    <p className="text-sm text-gray-600">Student</p>
+                    <h3 className="font-semibold text-base text-gray-700 mb-2">Role</h3>
+                    <p className="text-lg text-gray-900">Administrator</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        ) : (
+          // Student view - with tabs
+          <Tabs defaultValue="personal" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 bg-white border border-gray-200 shadow-sm">
+              <TabsTrigger value="personal" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-base">Personal Info</TabsTrigger>
+              <TabsTrigger value="history" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-base">Vote History</TabsTrigger>
+            </TabsList>
 
-          {/* Vote History Tab */}
-          <TabsContent value="history" className="space-y-4">
-            <Card className="bg-white border border-purple-200 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center space-x-2 text-lg text-gray-800">
-                  <History className="h-5 w-5 text-purple-600" />
-                  <span>Voting History</span>
-                </CardTitle>
-                <CardDescription className="text-sm text-gray-600">
-                  View all your past votes and download receipts
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {voteHistory.length === 0 ? (
-                  <div className="text-center py-8">
-                    <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No votes yet</h3>
-                    <p className="text-gray-500">You haven't participated in any elections yet.</p>
+            {/* Personal Information Tab */}
+            <TabsContent value="personal" className="space-y-6">
+              <Card className="bg-white border border-gray-200 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl text-gray-800 flex items-center space-x-3">
+                    <User className="h-6 w-6 text-purple-600" />
+                    <span>Personal Information</span>
+                  </CardTitle>
+                  <CardDescription className="text-base text-gray-600">
+                    Your account details and information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-base text-gray-700">Full Name</h3>
+                      <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">{user.name}</p>
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-base text-gray-700">Email Address</h3>
+                      <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">{user.email}</p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {voteHistory.map((vote) => (
-                      <div key={vote.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h3 className="font-medium text-sm">{vote.election.name}</h3>
-                            <p className="text-xs text-gray-600">{vote.election.description}</p>
-                          </div>
-                          <Badge variant="outline" className="text-xs border-purple-300 text-purple-700">
-                            {new Date(vote.created_at).toLocaleDateString()}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs">
-                            <p><strong>Voted for:</strong> {vote.candidate.name}</p>
-                            {vote.candidate.party && (
-                              <p><strong>Party:</strong> {vote.candidate.party}</p>
-                            )}
-                            <p className="text-gray-500">
-                              <strong>Receipt ID:</strong> {vote.vote_hash.slice(-16)}...
-                            </p>
+
+                  <Separator className="bg-gray-200" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-semibold text-base text-gray-700 mb-2">Organization</h3>
+                      <p className="text-lg text-gray-900">{organization.name}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base text-gray-700 mb-2">Role</h3>
+                      <p className="text-lg text-gray-900">Student</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Vote History Tab */}
+            <TabsContent value="history" className="space-y-6">
+              <Card className="bg-white border border-gray-200 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl text-gray-800 flex items-center space-x-3">
+                    <History className="h-6 w-6 text-purple-600" />
+                    <span>Voting History</span>
+                  </CardTitle>
+                  <CardDescription className="text-base text-gray-600">
+                    View all your past votes and download receipts
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {voteHistory.length === 0 ? (
+                    <div className="text-center py-12">
+                      <History className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No votes yet</h3>
+                      <p className="text-gray-600 text-base">You haven't participated in any elections yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {voteHistory.map((vote) => (
+                        <div key={vote.id} className="border border-gray-200 rounded-lg p-6 bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">{vote.election.name}</h3>
+                              <p className="text-sm text-gray-600 mt-1">{vote.election.description}</p>
+                            </div>
+                            <Badge variant="outline" className="text-sm border-purple-300 text-purple-700 bg-purple-50">
+                              {new Date(vote.created_at).toLocaleDateString()}
+                            </Badge>
                           </div>
                           
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => navigate(`/verify-vote/${vote.vote_hash}`)}
-                              className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                            >
-                              Verify Vote
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDownloadReceipt(vote)}
-                              className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              Receipt
-                            </Button>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-2">
+                              <p className="text-sm"><strong>Voted for:</strong> <span className="text-gray-900">{vote.candidate.name}</span></p>
+                              {vote.candidate.party && (
+                                <p className="text-sm"><strong>Party:</strong> <span className="text-gray-900">{vote.candidate.party}</span></p>
+                              )}
+                              <p className="text-xs text-gray-500">
+                                <strong>Receipt ID:</strong> {vote.vote_hash.slice(-16)}...
+                              </p>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => navigate(`/verify-vote/${vote.vote_hash}`)}
+                                className="h-9 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
+                              >
+                                Verify Vote
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDownloadReceipt(vote)}
+                                className="h-9 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Receipt
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </div>
   );

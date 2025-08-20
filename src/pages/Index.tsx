@@ -14,6 +14,9 @@ import FeatureSection from '@/components/FeatureSection';
 import StatsSection from '@/components/StatsSection';
 import { fetchTodayStats, fetchPlatformStats, PlatformStats } from "@/lib/api/stats";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { electionApi } from "@/lib/electionApi";
+import { supabase } from "@/lib/supabase";
 
 interface Election {
   id: string;
@@ -21,7 +24,7 @@ interface Election {
   start_time: string;
   end_time: string;
   is_active: boolean;
-  candidates: Array<{
+  candidates?: Array<{
     id: string;
     name: string;
     party: string;
@@ -33,11 +36,13 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { user, organization, isAuthenticated } = useAuth();
   const [activeElections, setActiveElections] = useState<Election[]>([]);
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [todayStats, setTodayStats] = useState({ votesToday: 0, usersToday: 0 });
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [electionsLoading, setElectionsLoading] = useState(false);
 
 
 
@@ -69,12 +74,29 @@ const Index = () => {
   useEffect(() => {
     const fetchElections = async () => {
       try {
-        // Only fetch elections if we have a valid organization_id
-        // For the home page, we'll show a message instead of trying to fetch with empty org_id
-        setActiveElections([]);
-        setSelectedElection(null);
+        setElectionsLoading(true);
+        
+        // Only fetch elections if user is authenticated and has an organization
+        if (isAuthenticated && organization?.id) {
+          const data = await electionApi.getElections(organization.id);
+          
+          // Filter for active elections only
+          const now = new Date();
+          const activeElectionsData = (data || []).filter(election => {
+            const startTime = new Date(election.start_time);
+            const endTime = new Date(election.end_time);
+            return election.is_active && now >= startTime && now <= endTime;
+          });
+
+          setActiveElections(activeElectionsData);
+        } else {
+          setActiveElections([]);
+        }
       } catch (error) {
         console.error('Failed to fetch elections:', error);
+        setActiveElections([]);
+      } finally {
+        setElectionsLoading(false);
       }
     };
 
@@ -99,7 +121,7 @@ const Index = () => {
     // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated, organization]);
 
 
 
@@ -272,7 +294,99 @@ const Index = () => {
           <FeatureSection />
 
         {/* Live Elections Section */}
-        {activeElections.length > 0 && (
+        {isAuthenticated && organization && activeElections.length > 0 && (
+          <section className="py-16 w-full bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-indigo-600/10 backdrop-blur-sm">
+            <div className="w-full px-4 sm:px-6 lg:px-8">
+              <div className="max-w-7xl mx-auto">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  viewport={{ once: true }}
+                  className="text-left mb-12"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-4xl font-bold mb-2 text-gray-900">Your Active Elections</h2>
+                      <p className="text-xl text-gray-600 max-w-3xl">
+                        Participate in ongoing elections for {organization.name}. 
+                        Each vote is encrypted, verified, and recorded securely for maximum integrity.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => navigate('/elections')}
+                      variant="outline"
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      View All Elections
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+
+                {electionsLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading your elections...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {activeElections.map((election, index) => (
+                      <motion.div
+                        key={election.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: index * 0.1 }}
+                        viewport={{ once: true }}
+                      >
+                        <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-white/90 backdrop-blur-sm">
+                          <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-3 text-xl">
+                              <div className="bg-gradient-to-r from-[#6B21E8] to-purple-600 p-3 rounded-xl">
+                                <Vote className="h-6 w-6 text-white" />
+                              </div>
+                              {election.name}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex items-center gap-3 text-gray-600">
+                              <Clock className="h-5 w-5" />
+                              <span className="font-medium">
+                                Ends: {new Date(election.end_time).toLocaleDateString()}
+                              </span>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div className="flex justify-between text-sm font-medium">
+                                <span className="text-gray-600">Progress</span>
+                                <span className="text-[#6B21E8]">{getElectionProgress(election.start_time, election.end_time)}%</span>
+                              </div>
+                              <Progress 
+                                value={getElectionProgress(election.start_time, election.end_time)} 
+                                className="h-3"
+                              />
+                            </div>
+
+                            <Button 
+                              onClick={() => navigate(`/vote/${election.id}`)}
+                              className="w-full bg-gradient-to-r from-[#6B21E8] to-purple-600 hover:from-[#6B21E8]/90 hover:to-purple-600/90 text-white font-semibold py-3 shadow-lg hover:shadow-xl transition-all duration-300"
+                            >
+                              Vote Now
+                              <ArrowRight className="ml-2 h-5 w-5" />
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Live Elections Section for non-authenticated users */}
+        {!isAuthenticated && activeElections.length > 0 && (
           <section className="py-16 w-full bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-indigo-600/10 backdrop-blur-sm">
             <div className="w-full px-4 sm:px-6 lg:px-8">
               <div className="max-w-7xl mx-auto">
@@ -328,10 +442,10 @@ const Index = () => {
                           </div>
 
                           <Button 
-                            onClick={() => navigate(`/vote/${election.id}`)}
+                            onClick={() => navigate('/auth')}
                             className="w-full bg-gradient-to-r from-[#6B21E8] to-purple-600 hover:from-[#6B21E8]/90 hover:to-purple-600/90 text-white font-semibold py-3 shadow-lg hover:shadow-xl transition-all duration-300"
                           >
-                            Vote Now
+                            Sign In to Vote
                             <ArrowRight className="ml-2 h-5 w-5" />
                           </Button>
                         </CardContent>

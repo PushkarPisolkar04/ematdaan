@@ -304,14 +304,14 @@ student3@college.edu`;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 pt-24 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <Button
             onClick={() => navigate('/admin')}
             variant="ghost"
-            className="mb-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            className="mb-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Admin
@@ -319,275 +319,275 @@ student3@college.edu`;
           
           <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-blue-100 p-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Invitation Manager
               </h1>
-              <p className="text-gray-600 text-sm">
+              <p className="text-lg text-gray-600">
                 Upload student list and send voting invitations
               </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-blue-200 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-            <CardTitle className="text-sm font-medium text-blue-800">Total Invitations</CardTitle>
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.total_invitations}</div>
-            <p className="text-xs text-blue-600">
-              Invitations sent
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-green-200 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100">
-            <CardTitle className="text-sm font-medium text-green-800">Used Invitations</CardTitle>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.used_invitations}</div>
-            <p className="text-xs text-green-600">
-              Students registered
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-yellow-200 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-yellow-100">
-            <CardTitle className="text-sm font-medium text-yellow-800">Pending Invitations</CardTitle>
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending_invitations}</div>
-            <p className="text-xs text-yellow-600">
-              Awaiting registration
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-pink-50 border-b border-red-100">
-            <CardTitle className="text-sm font-medium text-red-800">Expired Invitations</CardTitle>
-            <div className="p-2 bg-red-100 rounded-lg">
-              <XCircle className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{stats.expired_invitations}</div>
-            <p className="text-xs text-red-600">
-              Expired links
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="upload" className="space-y-4">
-        <TabsList className="bg-white border border-blue-200 shadow-sm">
-          <TabsTrigger value="upload" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Upload Students</TabsTrigger>
-          <TabsTrigger value="manual" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Manual Add</TabsTrigger>
-          <TabsTrigger value="invitations" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">Manage Invitations</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="upload" className="space-y-4">
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-              <CardTitle className="text-blue-800 font-semibold">Upload Student List</CardTitle>
-              <CardDescription className="text-blue-700">
-                Upload a CSV file with student emails to send voting invitations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              <div className="space-y-2">
-                <Label htmlFor="csv-upload">Select CSV File</Label>
-                <Input
-                  id="csv-upload"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileSelect}
-                  disabled={uploading}
-                  className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
-                />
-                <p className="text-sm text-muted-foreground">
-                  CSV should contain one email address per line. No headers required.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Button onClick={downloadSampleCSV} variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Sample CSV
-                </Button>
-              </div>
-
-              <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  Invitation emails will be sent automatically to all students in the CSV file. 
-                  Each student will receive a unique invitation link that can only be used once.
-                </AlertDescription>
-              </Alert>
-
-              <Button 
-                onClick={handleUpload} 
-                disabled={!selectedFile || uploading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploading ? 'Uploading...' : 'Upload and Send Invitations'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="manual" className="space-y-4">
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-              <CardTitle className="text-blue-800 font-semibold">Add Students Manually</CardTitle>
-              <CardDescription className="text-blue-700">
-                Add individual students by entering their email addresses
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              {manualInvitations.map((invitation, index) => (
-                <div key={index} className="flex items-center space-x-2 p-3 border border-blue-200 rounded-lg bg-blue-50">
-                  <div className="flex-1">
-                    <Label htmlFor={`email-${index}`} className="text-blue-700 font-medium">Email</Label>
-                                          <Input
-                        id={`email-${index}`}
-                        type="email"
-                        placeholder="student@example.com"
-                        value={invitation.email}
-                        onChange={(e) => updateManualInvitation(index, e.target.value)}
-                        className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
-                  </div>
-                  {manualInvitations.length > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeManualInvitationRow(index)}
-                      className="mt-6"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  )}
+        <div className="space-y-8">
+          {/* Enhanced Stats Cards */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                <CardTitle className="text-base font-semibold text-blue-800">Total Invitations</CardTitle>
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Users className="h-6 w-6 text-blue-600" />
                 </div>
-              ))}
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-blue-600 mb-1">{stats.total_invitations}</div>
+                <p className="text-sm text-blue-600">
+                  Invitations sent
+                </p>
+              </CardContent>
+            </Card>
 
-              <Button
-                variant="outline"
-                onClick={addManualInvitationRow}
-                className="w-full border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Student
-              </Button>
+            <Card className="border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100">
+                <CardTitle className="text-base font-semibold text-green-800">Used Invitations</CardTitle>
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-green-600 mb-1">{stats.used_invitations}</div>
+                <p className="text-sm text-green-600">
+                  Students registered
+                </p>
+              </CardContent>
+            </Card>
 
-              <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  Invitation emails will be sent automatically to all students you add. 
-                  Each student will receive a unique invitation link that can only be used once.
-                </AlertDescription>
-              </Alert>
+            <Card className="border-yellow-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-yellow-100">
+                <CardTitle className="text-base font-semibold text-yellow-800">Pending Invitations</CardTitle>
+                <div className="p-3 bg-yellow-100 rounded-xl">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-yellow-600 mb-1">{stats.pending_invitations}</div>
+                <p className="text-sm text-yellow-600">
+                  Awaiting registration
+                </p>
+              </CardContent>
+            </Card>
 
-                            <Button
-                onClick={handleManualInvitations}
-                disabled={sendingManual || manualInvitations.every(inv => !inv.email.trim())}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                {sendingManual ? 'Sending Invitations...' : 'Send Invitations'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <Card className="border-red-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-red-50 to-pink-50 border-b border-red-100">
+                <CardTitle className="text-base font-semibold text-red-800">Expired Invitations</CardTitle>
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-red-600 mb-1">{stats.expired_invitations}</div>
+                <p className="text-sm text-red-600">
+                  Expired links
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-        <TabsContent value="invitations" className="space-y-4">
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-              <CardTitle className="text-blue-800 font-semibold">Invitation List</CardTitle>
-              <CardDescription className="text-blue-700">
-                View and manage all sent invitations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sent Date</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Used Date</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invitations.map((invitation) => (
-                    <TableRow key={invitation.id}>
-                      <TableCell className="font-medium">
-                        {invitation.email}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(invitation)}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(invitation.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(invitation.expires_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {invitation.used_at 
-                          ? new Date(invitation.used_at).toLocaleDateString()
-                          : '-'
-                        }
-                      </TableCell>
-                      <TableCell>
+          <Tabs defaultValue="upload" className="space-y-6">
+            <TabsList className="bg-white border border-blue-200 shadow-sm">
+              <TabsTrigger value="upload" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white text-base">Upload Students</TabsTrigger>
+              <TabsTrigger value="manual" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white text-base">Manual Add</TabsTrigger>
+              <TabsTrigger value="invitations" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white text-base">Manage Invitations</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="upload" className="space-y-6">
+              <Card className="border-blue-200 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="text-xl text-blue-800 font-semibold">Upload Student List</CardTitle>
+                  <CardDescription className="text-base text-blue-700">
+                    Upload a CSV file with student emails to send voting invitations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 p-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="csv-upload" className="text-base font-semibold">Select CSV File</Label>
+                    <Input
+                      id="csv-upload"
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileSelect}
+                      disabled={uploading}
+                      className="border-blue-200 focus:border-blue-500 focus:ring-blue-500 h-12"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      CSV should contain one email address per line. No headers required.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <Button onClick={downloadSampleCSV} variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50 h-10">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Sample CSV
+                    </Button>
+                  </div>
+
+                  <Alert>
+                    <Mail className="h-4 w-4" />
+                    <AlertDescription className="text-base">
+                      Invitation emails will be sent automatically to all students in the CSV file. 
+                      Each student will receive a unique invitation link that can only be used once.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button 
+                    onClick={handleUpload} 
+                    disabled={!selectedFile || uploading}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg h-12 text-base"
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    {uploading ? 'Uploading...' : 'Upload and Send Invitations'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="manual" className="space-y-6">
+              <Card className="border-blue-200 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="text-xl text-blue-800 font-semibold">Add Students Manually</CardTitle>
+                  <CardDescription className="text-base text-blue-700">
+                    Add individual students by entering their email addresses
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 p-6">
+                  {manualInvitations.map((invitation, index) => (
+                    <div key={index} className="flex items-center space-x-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                      <div className="flex-1">
+                        <Label htmlFor={`email-${index}`} className="text-base text-blue-700 font-semibold">Email</Label>
+                        <Input
+                          id={`email-${index}`}
+                          type="email"
+                          placeholder="student@example.com"
+                          value={invitation.email}
+                          onChange={(e) => updateManualInvitation(index, e.target.value)}
+                          className="border-blue-200 focus:border-blue-500 focus:ring-blue-500 h-12"
+                        />
+                      </div>
+                      {manualInvitations.length > 1 && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteInvitation(invitation.id)}
-                          disabled={deletingInvitation === invitation.id}
-                          className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400"
+                          onClick={() => removeManualInvitationRow(index)}
+                          className="mt-8 h-10"
                         >
-                          {deletingInvitation === invitation.id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
+                          <XCircle className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      )}
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-              
-              {invitations.length === 0 && (
-                <div className="text-center py-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-                  <div className="p-3 bg-blue-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <Mail className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <p className="text-blue-600 font-medium">No invitations sent yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+                  <Button
+                    variant="outline"
+                    onClick={addManualInvitationRow}
+                    className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 h-12 text-base"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Another Student
+                  </Button>
+
+                  <Alert>
+                    <Mail className="h-4 w-4" />
+                    <AlertDescription className="text-base">
+                      Invitation emails will be sent automatically to all students you add. 
+                      Each student will receive a unique invitation link that can only be used once.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button
+                    onClick={handleManualInvitations}
+                    disabled={sendingManual || manualInvitations.every(inv => !inv.email.trim())}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg h-12 text-base"
+                  >
+                    <Mail className="h-5 w-5 mr-2" />
+                    {sendingManual ? 'Sending Invitations...' : 'Send Invitations'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="invitations" className="space-y-6">
+              <Card className="border-blue-200 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="text-xl text-blue-800 font-semibold">Invitation List</CardTitle>
+                  <CardDescription className="text-base text-blue-700">
+                    View and manage all sent invitations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-base font-semibold">Email</TableHead>
+                        <TableHead className="text-base font-semibold">Status</TableHead>
+                        <TableHead className="text-base font-semibold">Sent Date</TableHead>
+                        <TableHead className="text-base font-semibold">Expires</TableHead>
+                        <TableHead className="text-base font-semibold">Used Date</TableHead>
+                        <TableHead className="text-base font-semibold">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invitations.map((invitation) => (
+                        <TableRow key={invitation.id}>
+                          <TableCell className="font-semibold text-base">
+                            {invitation.email}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(invitation)}
+                          </TableCell>
+                          <TableCell className="text-base">
+                            {new Date(invitation.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-base">
+                            {new Date(invitation.expires_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-base">
+                            {invitation.used_at 
+                              ? new Date(invitation.used_at).toLocaleDateString()
+                              : '-'
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteInvitation(invitation.id)}
+                              disabled={deletingInvitation === invitation.id}
+                              className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400 h-10"
+                            >
+                              {deletingInvitation === invitation.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  
+                  {invitations.length === 0 && (
+                    <div className="text-center py-12 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                      <div className="p-4 bg-blue-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                        <Mail className="h-10 w-10 text-blue-600" />
+                      </div>
+                      <p className="text-blue-600 font-semibold text-lg">No invitations sent yet</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

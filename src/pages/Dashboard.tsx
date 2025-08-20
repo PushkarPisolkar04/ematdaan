@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatTimeRemaining } from '@/lib/utils';
 import { 
   Vote, 
   Clock, 
@@ -224,6 +225,22 @@ const Dashboard = () => {
     });
   };
 
+  // Separate elections by status
+  const activeElections = elections.filter(election => {
+    const status = getElectionStatus(election);
+    return status.status === 'active';
+  });
+
+  const upcomingElections = elections.filter(election => {
+    const status = getElectionStatus(election);
+    return status.status === 'upcoming';
+  });
+
+  const completedElections = elections.filter(election => {
+    const status = getElectionStatus(election);
+    return status.status === 'ended';
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 flex items-center justify-center">
@@ -237,70 +254,87 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {user?.name}!
-          </h1>
-          <p className="text-gray-600">
-            {organization?.name} • {userRole === 'admin' ? 'Administrator' : 'Student'}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {user?.name}!
+              </h1>
+              <p className="text-gray-600">
+                {organization?.name} • {userRole === 'admin' ? 'Administrator' : 'Student'}
+              </p>
+            </div>
+            <Button
+              onClick={() => loadDashboardData()}
+              variant="outline"
+              size="sm"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Data
+            </Button>
+          </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Enhanced Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Total Elections</p>
-                  <p className="text-2xl font-bold text-purple-900">{stats.totalElections}</p>
+                  <p className="text-sm font-medium text-purple-700 uppercase tracking-wide">Total Elections</p>
+                  <p className="text-3xl font-bold text-purple-900">{stats.totalElections}</p>
+                  <p className="text-xs text-purple-600 mt-1">Available to you</p>
                 </div>
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Calendar className="h-6 w-6 text-purple-600" />
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <Calendar className="h-8 w-8 text-purple-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Participated</p>
-                  <p className="text-2xl font-bold text-green-900">{stats.participatedElections}</p>
+                  <p className="text-sm font-medium text-green-700 uppercase tracking-wide">Participated</p>
+                  <p className="text-3xl font-bold text-green-900">{stats.participatedElections}</p>
+                  <p className="text-xs text-green-600 mt-1">Elections voted in</p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Active</p>
-                  <p className="text-2xl font-bold text-orange-900">{stats.activeElections}</p>
+                  <p className="text-sm font-medium text-orange-700 uppercase tracking-wide">Active</p>
+                  <p className="text-3xl font-bold text-orange-900">{stats.activeElections}</p>
+                  <p className="text-xs text-orange-600 mt-1">Currently running</p>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-lg">
-                  <Vote className="h-6 w-6 text-orange-600" />
+                <div className="p-3 bg-orange-100 rounded-xl">
+                  <Vote className="h-8 w-8 text-orange-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Upcoming</p>
-                  <p className="text-2xl font-bold text-blue-900">{stats.upcomingElections}</p>
+                  <p className="text-sm font-medium text-blue-700 uppercase tracking-wide">Upcoming</p>
+                  <p className="text-3xl font-bold text-blue-900">{stats.upcomingElections}</p>
+                  <p className="text-xs text-blue-600 mt-1">Scheduled soon</p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Clock className="h-6 w-6 text-blue-600" />
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Clock className="h-8 w-8 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -309,15 +343,259 @@ const Dashboard = () => {
 
         {/* Elections Section */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Elections</h2>
-            <div className="flex items-center space-x-2">
-              <Info className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600">Click on an election to vote or view results</span>
-            </div>
-          </div>
+          {/* Active Elections Section */}
+          {activeElections.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-2xl font-bold text-gray-900">Active Elections</h2>
+                  <Badge className="bg-purple-100 text-purple-800">
+                    {activeElections.length} ongoing
+                  </Badge>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Info className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Vote now in these active elections</span>
+                </div>
+              </div>
 
-          {elections.length === 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeElections.map((election) => {
+                  const status = getElectionStatus(election);
+                  const timeRemaining = formatTimeRemaining(election.start_time, election.end_time);
+                  return (
+                    <Card 
+                      key={election.id} 
+                      className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+                      onClick={() => {
+                        if (!election.has_voted) {
+                          handleVote(election.id);
+                        } else {
+                          handleViewResults(election.id);
+                        }
+                      }}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg text-gray-900">{election.name}</CardTitle>
+                          <Badge className={status.color}>
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-sm text-gray-600">
+                          {election.candidates_count} candidates
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Start:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.start_time)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">End:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.end_time)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Time Left:</span>
+                            <span className="text-purple-600 font-medium">{timeRemaining}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Status:</span>
+                            <div className="flex items-center space-x-2">
+                              {election.has_voted && (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              )}
+                              <span className={election.has_voted ? 'text-green-600' : 'text-gray-900'}>
+                                {election.has_voted ? 'Voted' : 'Not Voted'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <Button 
+                            className="w-full"
+                            variant={!election.has_voted ? 'default' : 'outline'}
+                            disabled={election.has_voted}
+                            onClick={() => {
+                              if (!election.has_voted) {
+                                handleVote(election.id);
+                              } else {
+                                handleViewResults(election.id);
+                              }
+                            }}
+                          >
+                            {!election.has_voted ? (
+                              <>
+                                <Vote className="h-4 w-4 mr-2" />
+                                Vote Now
+                              </>
+                            ) : (
+                              <>
+                                <BarChart3 className="h-4 w-4 mr-2" />
+                                View Results
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Elections Section */}
+          {upcomingElections.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-2xl font-bold text-gray-900">Upcoming Elections</h2>
+                  <Badge className="bg-blue-100 text-blue-800">
+                    {upcomingElections.length} scheduled
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {upcomingElections.map((election) => {
+                  const status = getElectionStatus(election);
+                  return (
+                    <Card 
+                      key={election.id} 
+                      className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                      onClick={() => handleViewResults(election.id)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg text-gray-900">{election.name}</CardTitle>
+                          <Badge className={status.color}>
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-sm text-gray-600">
+                          {election.candidates_count} candidates
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Start:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.start_time)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">End:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.end_time)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <Button 
+                            variant="outline"
+                            disabled
+                            className="w-full border-gray-300 text-gray-500"
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Coming Soon
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Elections Section */}
+          {completedElections.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-2xl font-bold text-gray-900">Completed Elections</h2>
+                  <Badge className="bg-gray-100 text-gray-800">
+                    {completedElections.length} finished
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {completedElections.map((election) => {
+                  const status = getElectionStatus(election);
+                  return (
+                    <Card 
+                      key={election.id} 
+                      className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                      onClick={() => handleViewResults(election.id)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg text-gray-900">{election.name}</CardTitle>
+                          <Badge className={status.color}>
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-sm text-gray-600">
+                          {election.candidates_count} candidates
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Start:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.start_time)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">End:</span>
+                            <span className="text-gray-900">
+                              {formatDateTime(election.end_time)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Status:</span>
+                            <div className="flex items-center space-x-2">
+                              {election.has_voted && (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              )}
+                              <span className={election.has_voted ? 'text-green-600' : 'text-gray-900'}>
+                                {election.has_voted ? 'Voted' : 'Not Voted'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <Button 
+                            variant="outline"
+                            className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                            onClick={() => handleViewResults(election.id)}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-2" />
+                            View Results
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* No Elections Message */}
+          {elections.length === 0 && (
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardContent className="p-8 text-center">
                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -331,96 +609,6 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {elections.map((election) => {
-                const status = getElectionStatus(election);
-                return (
-                  <Card 
-                    key={election.id} 
-                    className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
-                    onClick={() => {
-                      if (status.status === 'active' && !election.has_voted) {
-                        handleVote(election.id);
-                      } else if (status.status !== 'upcoming') {
-                        handleViewResults(election.id);
-                      }
-                    }}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg text-gray-900">{election.name}</CardTitle>
-                        <Badge className={status.color}>
-                          {status.label}
-                        </Badge>
-                      </div>
-                      <CardDescription className="text-sm text-gray-600">
-                        {election.candidates_count} candidates
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Start:</span>
-                          <span className="text-gray-900">
-                            {formatDateTime(election.start_time)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">End:</span>
-                          <span className="text-gray-900">
-                            {formatDateTime(election.end_time)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Status:</span>
-                          <div className="flex items-center space-x-2">
-                            {election.has_voted && (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            )}
-                            <span className={election.has_voted ? 'text-green-600' : 'text-gray-900'}>
-                              {election.has_voted ? 'Voted' : 'Not Voted'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <Button 
-                          className="w-full"
-                          variant={status.status === 'active' && !election.has_voted ? 'default' : 'outline'}
-                          disabled={status.status !== 'active' || election.has_voted}
-                          onClick={() => {
-                            if (status.status === 'active' && !election.has_voted) {
-                              handleVote(election.id);
-                            } else if (status.status !== 'upcoming') {
-                              handleViewResults(election.id);
-                            }
-                          }}
-                        >
-                          {status.status === 'active' && !election.has_voted ? (
-                            <>
-                              <Vote className="h-4 w-4 mr-2" />
-                              Vote Now
-                            </>
-                          ) : status.status === 'upcoming' ? (
-                            <>
-                              <Clock className="h-4 w-4 mr-2" />
-                              Coming Soon
-                            </>
-                          ) : (
-                            <>
-                              <BarChart3 className="h-4 w-4 mr-2" />
-                              View Results
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
           )}
         </div>
       </div>
