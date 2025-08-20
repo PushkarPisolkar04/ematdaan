@@ -5,34 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  createOrganization,
-  validateAccessCode,
-  validateInvitationToken,
-  registerUser,
-  loginUser,
-  verifyUserEmail,
-  getUserOrganizations,
-  createSession,
-  createInvitationToken
-} from '@/lib/api/traditionalAuth';
-import { verifyOTP, sendOTP } from '@/lib/otp';
-import { supabase } from '@/lib/supabase';
-import { Mail, Lock, User, Shield, Users, Building, Key, ArrowRight, HelpCircle, Info } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Mail, Lock, User, Shield, Users, Building, Key, ArrowRight, HelpCircle, Info, CheckCircle } from 'lucide-react';
 
 const Login = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('login');
-  const [authMode, setAuthMode] = useState<'access_code' | 'invitation' | 'organization' | 'organization_created' | 'direct_login'>('direct_login');
   const [isLoading, setIsLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { login, register, createOrganization, joinOrganization } = useAuth();
 
   // Form data
-  const [accessCode, setAccessCode] = useState('');
   const [invitationToken, setInvitationToken] = useState('');
   const [loginData, setLoginData] = useState({
     email: '',
@@ -51,103 +36,77 @@ const Login = () => {
     password: '',
     confirmPassword: ''
   });
-  const [otpData, setOtpData] = useState({
-    otp: ''
+  const [joinData, setJoinData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
   });
-
-  // Organization and role context
-  const [organization, setOrganization] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string>('');
-  const [tokenId, setTokenId] = useState<string>('');
 
   // Check for invitation token in URL
   useEffect(() => {
-    const token = searchParams.get('token');
+    const token = searchParams.get('invitation');
     if (token) {
       setInvitationToken(token);
-      setAuthMode('invitation');
-      handleValidateInvitation(token);
+      setActiveTab('join');
     }
   }, [searchParams]);
 
-  // Check for organization creation state
-  useEffect(() => {
-    if (location.state?.mode === 'organization_created' && location.state?.organization) {
-      setOrganization(location.state.organization);
-      setAuthMode('organization_created');
-      setShowOTP(true);
-      setTimeLeft(300); // 5 minutes
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!loginData.email || !loginData.password) {
       toast({
-        title: "Organization Created Successfully!",
-        description: "Please check your email for the verification code to complete setup"
-      });
-    }
-  }, [location.state, toast]);
-
-  // Countdown timer for OTP
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const handleValidateAccessCode = async () => {
-    if (!accessCode.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an access code",
+        title: "Missing Information",
+        description: "Please fill in all fields",
         variant: "destructive"
       });
       return;
     }
 
-    setIsLoading(true);
     try {
-      const result = await validateAccessCode(accessCode);
-      setOrganization(result.organization);
-      setUserRole(result.role);
-      setAuthMode('access_code');
-      
-      toast({
-        title: "Access Code Valid",
-        description: `You're joining ${result.organization.name} as a ${result.role}`
-      });
+      setIsLoading(true);
+      await login(loginData.email, loginData.password);
+      navigate('/dashboard');
     } catch (error) {
-      console.error('Access code validation error:', error);
-      toast({
-        title: "Invalid Access Code",
-        description: error instanceof Error ? error.message : 'Please check your access code',
-        variant: "destructive"
-      });
+      console.error('Login failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleValidateInvitation = async (token: string) => {
-    setIsLoading(true);
-    try {
-      const result = await validateInvitationToken(token);
-      setOrganization(result.organization);
-      setUserRole(result.role);
-      setTokenId(result.tokenId);
-      setAuthMode('invitation');
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
       
+    if (!registerData.email || !registerData.password || !registerData.name) {
       toast({
-        title: "Invitation Valid",
-        description: `You're joining ${result.organization.name} as a ${result.role}`
-      });
-    } catch (error) {
-      console.error('Invitation validation error:', error);
-      toast({
-        title: "Invalid Invitation",
-        description: error instanceof Error ? error.message : 'Please check your invitation link',
+        title: "Missing Information",
+        description: "Please fill in all fields",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (registerData.password !== registerData.confirmPassword) {
+      toast({
+        title: "Passwords Don't Match",
+        description: "Please make sure your passwords match",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await register(registerData.email, registerData.password, registerData.name);
+      toast({
+        title: "Registration Successful",
+        description: "You can now log in with your credentials"
+      });
+      setActiveTab('login');
+      setLoginData({ email: registerData.email, password: '' });
+    } catch (error) {
+      console.error('Registration failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -156,903 +115,392 @@ const Login = () => {
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!orgData.name || !orgData.ownerName || !orgData.ownerEmail || !orgData.password) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (orgData.password !== orgData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Passwords do not match",
+        title: "Passwords Don't Match",
+        description: "Please make sure your passwords match",
         variant: "destructive"
       });
       return;
     }
 
-    setIsLoading(true);
     try {
-      const result = await createOrganization({
+      setIsLoading(true);
+      await createOrganization({
         name: orgData.name,
         ownerName: orgData.ownerName,
         ownerEmail: orgData.ownerEmail,
         ownerPassword: orgData.password
       });
-      
-      console.log('Organization creation result:', result);
-      console.log('User from result:', result.user);
-      console.log('Organization from result:', result.organization);
-      console.log('Access codes from result:', result.accessCodes);
-
-      if (result.otpSent) {
-        setShowOTP(true);
-        setTimeLeft(300); // 5 minutes
-        
-        // Store access codes and user info in location state for later display
-        if (result.accessCodes) {
-          console.log('Storing state for auto-login:', {
-            organization: result.organization,
-            user: result.user,
-            accessCodes: result.accessCodes
-          });
-          
-          navigate(location.pathname, {
-            state: {
-              organization: result.organization,
-              user: result.user, // Store user info for auto-login
-              ownerEmail: orgData.ownerEmail,
-              mode: 'organization_created',
-              accessCodes: result.accessCodes
-            },
-            replace: true
-          });
-        }
-        
-        toast({
-          title: "Organization Created Successfully!",
-          description: "Please check your email for verification code and access codes"
-        });
-      }
-    } catch (error) {
-      console.error('Organization creation error:', error);
       toast({
-        title: "Creation Failed",
-        description: error instanceof Error ? error.message : 'Failed to create organization',
-        variant: "destructive"
+        title: "Organization Created",
+        description: "Your organization has been created successfully. You can now log in."
       });
+      setActiveTab('login');
+      setLoginData({ email: orgData.ownerEmail, password: '' });
+    } catch (error) {
+      console.error('Organization creation failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleJoinOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!organization) {
+    if (!invitationToken || !joinData.name || !joinData.email || !joinData.password) {
       toast({
-        title: "Error",
-        description: "No organization selected",
+        title: "Missing Information",
+        description: "Please fill in all fields and provide a valid invitation token",
         variant: "destructive"
       });
       return;
     }
 
-    if (registerData.password !== registerData.confirmPassword) {
+    if (joinData.password !== joinData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Passwords do not match",
+        title: "Passwords Don't Match",
+        description: "Please make sure your passwords match",
         variant: "destructive"
       });
       return;
     }
 
-    setIsLoading(true);
     try {
-      const result = await registerUser({
-        email: registerData.email,
-        password: registerData.password,
-        name: registerData.name,
-        organizationId: organization.id,
-        role: userRole,
-        tokenId: tokenId,
-        joinedVia: authMode
+      setIsLoading(true);
+      await joinOrganization(invitationToken, {
+        name: joinData.name,
+        email: joinData.email,
+        password: joinData.password
       });
-
-      if (result.otpSent) {
-          setShowOTP(true);
-        setTimeLeft(300); // 5 minutes
-          toast({
-          title: "Registration Successful",
-          description: "Please check your email for verification code"
-          });
-        }
-    } catch (error) {
-      console.error('Registration error:', error);
       toast({
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : 'Failed to register',
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDirectLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    setIsLoading(true);
-    try {
-      // First, get user's organizations
-      const { data: user, error: userError } = await supabase
-        .from('auth_users')
-        .select('*')
-        .eq('email', loginData.email)
-        .single();
-
-      if (userError || !user) {
-        throw new Error('User not found. Please check your email or register first.');
-      }
-
-      // Get user's organizations
-      const userOrgs = await getUserOrganizations(user.id);
-      
-      if (!userOrgs || userOrgs.length === 0) {
-        throw new Error('No organizations found. Please join an organization first.');
-      }
-
-      // If user has multiple organizations, use the first active one
-      const activeOrg = userOrgs.find(org => org.is_active) || userOrgs[0];
-      
-      // Now login with the organization
-      const result = await loginUser({
-        email: loginData.email,
-        password: loginData.password,
-        organizationId: activeOrg.organization_id
-      });
-
-      // Store session
-      localStorage.setItem('session_token', result.sessionToken);
-      localStorage.setItem('user_id', result.user.id);
-      localStorage.setItem('user_email', result.user.email);
-      localStorage.setItem('user_role', result.userOrganization.role);
-      localStorage.setItem('organization_id', activeOrg.organization_id);
-      localStorage.setItem('isAuthenticated', 'true');
-
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${result.user.name}!`
-      });
-
-      // Redirect based on role
-      if (result.userOrganization.role === 'org_owner' || result.userOrganization.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      console.error('Direct login error:', error);
-      toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : 'Invalid credentials',
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!organization) {
-      toast({
-        title: "Error",
-        description: "No organization selected",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const result = await loginUser({
-        email: loginData.email,
-        password: loginData.password,
-        organizationId: organization.id
-      });
-
-      // Store session
-      localStorage.setItem('session_token', result.sessionToken);
-      localStorage.setItem('user_id', result.user.id);
-      localStorage.setItem('user_email', result.user.email);
-      localStorage.setItem('user_role', result.userOrganization.role);
-      localStorage.setItem('organization_id', organization.id);
-      localStorage.setItem('isAuthenticated', 'true');
-
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${result.user.name}!`
-      });
-
-      // Redirect based on role
-      if (result.userOrganization.role === 'org_owner' || result.userOrganization.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : 'Invalid credentials',
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setIsLoading(true);
-    try {
-      let emailToVerify;
-      
-      if (authMode === 'organization_created') {
-        // For organization creation, verify the owner's email
-        emailToVerify = location.state?.ownerEmail;
-      } else {
-        // For regular login/registration
-        emailToVerify = registerData.email || orgData.ownerEmail;
-      }
-      
-      // Update user as verified (this also verifies the OTP)
-      const user = await verifyUserEmail(emailToVerify, otpData.otp);
-
-      if (authMode === 'organization_created') {
-        // Show access codes to admin after verification
-        const accessCodes = location.state?.accessCodes;
-        const organization = location.state?.organization;
-        
-        if (accessCodes || organization) {
-          const voterCode = accessCodes?.voterCode || organization?.voter_access_code;
-          const adminCode = accessCodes?.adminCode || organization?.admin_access_code;
-          
-          // Create secure invitation link if not available
-          let invitationText = '';
-          if (accessCodes?.invitationLink) {
-            invitationText = `\n🔗 Invitation Link:\n${accessCodes.invitationLink}`;
-          } else if (organization) {
-            // Create a secure invitation token
-            try {
-              const userData = location.state?.user || await supabase
-                .from('auth_users')
-                .select('*')
-                .eq('email', location.state?.ownerEmail)
-                .single()
-                .then(result => result.data);
-              
-              if (userData) {
-                const invitationToken = await createInvitationToken({
-                  organizationId: organization.id,
-                  role: 'admin',
-                  expiresInDays: 7,
-                  usageLimit: 10,
-                  createdBy: userData.id
-                });
-                
-                                 if (invitationToken && invitationToken.token) {
-                   const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-                   invitationText = `\n🔗 Secure Invitation Link:\n${baseUrl}/login?token=${invitationToken.token}`;
-                 }
-              }
-            } catch (error) {
-              console.error('Failed to create invitation token');
-            }
-          }
-          
-          // Show success toast first
-          toast({
-            title: "🎉 Email Verified Successfully!",
-            description: "Your organization is now active. Access codes have been sent to your email.",
-            duration: 5000
-          });
-          
-          // Show access codes in a better format after a short delay
-          setTimeout(() => {
-            toast({
-              title: "📋 Your Organization Access Codes",
-              description: `Voter: ${voterCode} | Admin: ${adminCode}`,
-              duration: 10000
+        title: "Joined Organization",
+        description: "You have successfully joined the organization. You can now log in."
             });
-          }, 1000);
-        }
-        
-        // Automatically create session for the admin
-        try {
-          console.log('Location state in OTP verification:', location.state);
-          const user = location.state?.user;
-          const organization = location.state?.organization;
-          const ownerEmail = location.state?.ownerEmail;
-          
-          console.log('User data:', user);
-          console.log('Organization data:', organization);
-          console.log('Owner email:', ownerEmail);
-          
-          if (organization && ownerEmail) {
-            // If user data is missing, fetch it from database
-            let userData = user;
-            if (!userData) {
-              console.log('Fetching user data from database for email:', ownerEmail);
-              const { data: fetchedUser, error: fetchError } = await supabase
-                .from('auth_users')
-                .select('*')
-                .eq('email', ownerEmail)
-                .single();
-              
-              if (fetchError || !fetchedUser) {
-                throw new Error('Could not fetch user data');
-              }
-              userData = fetchedUser;
-              console.log('Fetched user data:', userData);
-            }
-            
-            // Create session directly using the createSession function
-            console.log('Creating session for user:', userData.id, 'organization:', organization.id);
-            const sessionToken = await createSession(userData.id, organization.id);
-            console.log('Session created successfully:', sessionToken);
-            
-            // Store session
-            localStorage.setItem('session_token', sessionToken);
-            localStorage.setItem('user_id', userData.id);
-            localStorage.setItem('user_email', userData.email);
-            localStorage.setItem('user_role', 'org_owner');
-            localStorage.setItem('organization_id', organization.id);
-            localStorage.setItem('isAuthenticated', 'true');
-            
-            // Navigate to admin dashboard
-            navigate('/admin', { 
-              state: { 
-                organization: organization,
-                userRole: 'org_owner'
-              }
-            });
-            
-            toast({
-              title: "Welcome to Admin Dashboard!",
-              description: "You have been automatically logged in"
-            });
-          } else {
-            throw new Error('Missing organization or owner email data');
-          }
-        } catch (sessionError) {
-          console.error('Auto-login failed:', sessionError);
-          // If auto-login fails, redirect to login with organization selected
-          setOrganization(location.state?.organization);
-          setUserRole('org_owner');
           setActiveTab('login');
-          setShowOTP(false);
-          setOtpData({ otp: '' });
-          toast({
-            title: "Email Verified",
-            description: "Please log in with your password to access admin dashboard"
-          });
-        }
-      } else {
-        // Switch to login tab for regular users
-        setActiveTab('login');
-        setLoginData({ email: emailToVerify, password: '' });
-        setShowOTP(false);
-        setOtpData({ otp: '' });
-        
-        toast({
-          title: "Email Verified",
-          description: "Your account has been successfully verified!"
-        });
-      }
-
+      setLoginData({ email: joinData.email, password: '' });
     } catch (error) {
-      console.error('OTP verification error:', error);
-      toast({
-        title: "Verification Failed",
-        description: error instanceof Error ? error.message : 'Invalid OTP',
-        variant: "destructive"
-      });
+      console.error('Join organization failed:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const resendOTP = async () => {
-    try {
-      // Re-register to send new OTP
-      if (authMode === 'organization') {
-        await createOrganization({
-          name: orgData.name,
-          ownerName: orgData.ownerName,
-          ownerEmail: orgData.ownerEmail,
-          ownerPassword: orgData.password
-        });
-      } else if (authMode === 'organization_created') {
-        // For organization creation, we can't recreate the organization
-        // Just send a new OTP to the owner's email
-        const result = await sendOTP(location.state?.ownerEmail);
-        console.log('Resend OTP result:', result);
-      } else {
-        await registerUser({
-        email: registerData.email,
-        password: registerData.password,
-        name: registerData.name,
-          organizationId: organization.id,
-          role: userRole,
-          tokenId: tokenId,
-          joinedVia: authMode
-        });
-      }
-      
-      setTimeLeft(300);
-      toast({
-        title: "OTP Resent",
-        description: "A new verification code has been sent to your email"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to resend OTP",
-        variant: "destructive"
-      });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pt-20">
-      <div className="w-full max-w-4xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-[calc(100vh-5rem)]">
-          {/* Help Section */}
-          <div className="hidden lg:block">
-            <Card className="h-full bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl text-blue-800">
-                  <HelpCircle className="h-6 w-6" />
-                  Quick Guide
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-lg mb-2 text-green-800">Existing Users:</h4>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">• Click "Login" to sign in directly</p>
-                    <p className="text-gray-700">• Use your email and password</p>
-                    <p className="text-gray-700">• Access your dashboard instantly</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-lg mb-2 text-blue-800">New Users:</h4>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">• Get access code from your organization admin</p>
-                    <p className="text-gray-700">• Click "Join Org" and enter the code</p>
-                    <p className="text-gray-700">• Register and verify your email</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-lg mb-2 text-purple-800">Organization Owners:</h4>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">• Click "Create Org" to set up organization</p>
-                    <p className="text-gray-700">• Generate access codes for your members</p>
-                    <p className="text-gray-700">• Create and manage elections</p>
-                  </div>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">
-                    <strong>Need help?</strong> Contact your organization administrator for access codes.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Side - Auth Forms */}
+        <div className="space-y-6">
+          <div className="text-center lg:text-left">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to E-Matdaan</h1>
+            <p className="text-gray-600">Secure digital voting platform for organizations</p>
           </div>
 
-          {/* Login Form */}
-          <Card className="w-full max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <CardHeader className="text-center sticky top-0 bg-white z-10">
-              <CardTitle className="text-2xl">
-                {organization ? organization.name : ''}
-              </CardTitle>
-              <CardDescription>
-                {showOTP ? 'Verify your email' : 
-                 organization ? `Join as ${userRole}` : 
-                 ''}
-              </CardDescription>
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Authentication</CardTitle>
+              <CardDescription>Choose how you want to access the platform</CardDescription>
             </CardHeader>
         <CardContent>
-          {showOTP ? (
-            <form onSubmit={handleVerifyOTP} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Verification Code
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    value={otpData.otp}
-                    onChange={(e) => setOtpData({ otp: e.target.value })}
-                    placeholder="Enter 6-digit code"
-                    className="pl-10"
-                    maxLength={6}
-                    required
-                  />
-                </div>
-                
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="login">Login</TabsTrigger>
+                  <TabsTrigger value="register">Register</TabsTrigger>
+                  <TabsTrigger value="create">Create Org</TabsTrigger>
+                  <TabsTrigger value="join">Join Org</TabsTrigger>
+                </TabsList>
 
-              </div>
-              
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Verifying...' : 'Verify Email'}
-              </Button>
-                  
-              <div className="text-center">
-                {timeLeft > 0 ? (
-                  <p className="text-sm text-gray-600">
-                    Resend code in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                  </p>
-                ) : (
-                  <Button 
-                    type="button" 
-                    variant="link" 
-                    onClick={resendOTP}
-                    className="text-sm"
-                  >
-                    Resend Code
-                  </Button>
-                )}
-                
-
-              </div>
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  setShowOTP(false);
-                  setActiveTab('login');
-                }}
-              >
-                Back to Login
-              </Button>
-            </form>
-          ) : (
-            <div className="space-y-6">
-              {/* Auth Mode Selection */}
-              {!organization && (
-                <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('direct_login')}
-                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                      authMode === 'direct_login'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <User className="h-4 w-4" />
-                    Login
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('access_code')}
-                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                      authMode === 'access_code'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Key className="h-4 w-4" />
-                    Join Org
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('organization')}
-                    className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                      authMode === 'organization'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Building className="h-4 w-4" />
-                    Create Org
-                  </button>
-                </div>
-              )}
-
-              {/* Direct Login Form */}
-              {authMode === 'direct_login' && !organization && (
-                <div className="space-y-4">
-                  <div className="text-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Welcome Back!</h3>
-                    <p className="text-sm text-gray-600">Sign in to your account</p>
-                  </div>
-                  
-                  <form onSubmit={handleDirectLogin} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                {/* Login Tab */}
+                <TabsContent value="login" className="space-y-4">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="login-email" className="text-sm font-medium">Email</label>
                         <Input
+                        id="login-email"
                           type="email"
+                        placeholder="Enter your email"
                           value={loginData.email}
                           onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                          placeholder="Enter your email"
-                          className="pl-10"
                           required
                         />
-                      </div>
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <div className="space-y-2">
+                      <label htmlFor="login-password" className="text-sm font-medium">Password</label>
                         <Input
+                        id="login-password"
                           type="password"
+                        placeholder="Enter your password"
                           value={loginData.password}
                           onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                          placeholder="Enter your password"
-                          className="pl-10"
                           required
                         />
-                      </div>
                     </div>
-                    
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? 'Signing in...' : 'Sign In'}
                     </Button>
-                    
+                  </form>
                     <div className="text-center">
-                      <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
                         Forgot your password?
                       </Link>
                     </div>
-                  </form>
-                </div>
-              )}
+                </TabsContent>
 
-              {/* Access Code Input */}
-              {authMode === 'access_code' && !organization && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Access Code
-                    </label>
-                    <div className="relative">
-                      <Key className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="text"
-                        value={accessCode}
-                        onChange={(e) => setAccessCode(e.target.value)}
-                        placeholder="Enter your access code"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleValidateAccessCode}
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Validating...' : 'Continue'}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              {/* Organization Creation */}
-              {authMode === 'organization' && !organization && (
-                <form onSubmit={handleCreateOrganization} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Organization Name
-                    </label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="text"
-                        value={orgData.name}
-                        onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
-                        placeholder="Enter organization name"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Your Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="text"
-                        value={orgData.ownerName}
-                        onChange={(e) => setOrgData({ ...orgData, ownerName: e.target.value })}
-                        placeholder="Enter your full name"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="email"
-                        value={orgData.ownerEmail}
-                        onChange={(e) => setOrgData({ ...orgData, ownerEmail: e.target.value })}
-                        placeholder="Enter your email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="password"
-                        value={orgData.password}
-                        onChange={(e) => setOrgData({ ...orgData, password: e.target.value })}
-                        placeholder="Create a password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="password"
-                        value={orgData.confirmPassword}
-                        onChange={(e) => setOrgData({ ...orgData, confirmPassword: e.target.value })}
-                        placeholder="Confirm your password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating Organization...' : 'Create Organization'}
-                  </Button>
-                </form>
-              )}
-
-              {/* Registration Form for Organization Join */}
-              {organization && (
-                <div className="space-y-4">
-                  <div className="text-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Join {organization.name}</h3>
-                    <p className="text-sm text-gray-600">Create your account to get started</p>
-                  </div>
-              
+                {/* Register Tab */}
+                <TabsContent value="register" className="space-y-4">
                   <form onSubmit={handleRegister} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Full Name
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="text"
-                          value={registerData.name}
-                          onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                          placeholder="Enter your full name"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <label htmlFor="register-name" className="text-sm font-medium">Full Name</label>
+                      <Input
+                        id="register-name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={registerData.name}
+                        onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
+                        required
+                      />
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="email"
-                          value={registerData.email}
-                          onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                          placeholder="Enter your email"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <label htmlFor="register-email" className="text-sm font-medium">Email</label>
+                      <Input
+                        id="register-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={registerData.email}
+                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                        required
+                      />
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="password"
-                          value={registerData.password}
-                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                          placeholder="Create a password"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <label htmlFor="register-password" className="text-sm font-medium">Password</label>
+                      <Input
+                        id="register-password"
+                        type="password"
+                        placeholder="Create a password"
+                        value={registerData.password}
+                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                        required
+                      />
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Confirm Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="password"
-                          value={registerData.confirmPassword}
-                          onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                          placeholder="Confirm your password"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    
+                    <div className="space-y-2">
+                      <label htmlFor="register-confirm" className="text-sm font-medium">Confirm Password</label>
+                      <Input
+                        id="register-confirm"
+                        type="password"
+                        placeholder="Confirm your password"
+                        value={registerData.confirmPassword}
+                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                        required
+                      />
+                  </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? 'Creating account...' : 'Create Account'}
+                  </Button>
+                  </form>
+                </TabsContent>
+
+                {/* Create Organization Tab */}
+                <TabsContent value="create" className="space-y-4">
+                <form onSubmit={handleCreateOrganization} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="org-name" className="text-sm font-medium">Organization Name</label>
+                      <Input
+                        id="org-name"
+                        type="text"
+                        placeholder="Enter organization name"
+                        value={orgData.name}
+                        onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="owner-name" className="text-sm font-medium">Admin Name</label>
+                      <Input
+                        id="owner-name"
+                        type="text"
+                        placeholder="Enter admin name"
+                        value={orgData.ownerName}
+                        onChange={(e) => setOrgData({ ...orgData, ownerName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="owner-email" className="text-sm font-medium">Admin Email</label>
+                      <Input
+                        id="owner-email"
+                        type="email"
+                        placeholder="Enter admin email"
+                        value={orgData.ownerEmail}
+                        onChange={(e) => setOrgData({ ...orgData, ownerEmail: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="owner-password" className="text-sm font-medium">Admin Password</label>
+                      <Input
+                        id="owner-password"
+                        type="password"
+                        placeholder="Create admin password"
+                        value={orgData.password}
+                        onChange={(e) => setOrgData({ ...orgData, password: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="owner-confirm" className="text-sm font-medium">Confirm Password</label>
+                      <Input
+                        id="owner-confirm"
+                        type="password"
+                        placeholder="Confirm admin password"
+                        value={orgData.confirmPassword}
+                        onChange={(e) => setOrgData({ ...orgData, confirmPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Creating organization...' : 'Create Organization'}
+                  </Button>
+                </form>
+                </TabsContent>
+
+                {/* Join Organization Tab */}
+                <TabsContent value="join" className="space-y-4">
+                  <form onSubmit={handleJoinOrganization} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="invitation-token" className="text-sm font-medium">Invitation Token</label>
+                        <Input
+                        id="invitation-token"
+                          type="text"
+                        placeholder="Enter invitation token"
+                        value={invitationToken}
+                        onChange={(e) => setInvitationToken(e.target.value)}
+                          required
+                        />
+                      </div>
+                    <div className="space-y-2">
+                      <label htmlFor="join-name" className="text-sm font-medium">Full Name</label>
+                      <Input
+                        id="join-name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={joinData.name}
+                        onChange={(e) => setJoinData({ ...joinData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="join-email" className="text-sm font-medium">Email</label>
+                        <Input
+                        id="join-email"
+                          type="email"
+                          placeholder="Enter your email"
+                        value={joinData.email}
+                        onChange={(e) => setJoinData({ ...joinData, email: e.target.value })}
+                          required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="join-password" className="text-sm font-medium">Password</label>
+                        <Input
+                        id="join-password"
+                          type="password"
+                          placeholder="Create a password"
+                        value={joinData.password}
+                        onChange={(e) => setJoinData({ ...joinData, password: e.target.value })}
+                          required
+                        />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="join-confirm" className="text-sm font-medium">Confirm Password</label>
+                        <Input
+                        id="join-confirm"
+                          type="password"
+                          placeholder="Confirm your password"
+                        value={joinData.confirmPassword}
+                        onChange={(e) => setJoinData({ ...joinData, confirmPassword: e.target.value })}
+                          required
+                        />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? 'Joining organization...' : 'Join Organization'}
                     </Button>
                   </form>
-              
-
-              </div>
-              )}
-
-              {/* Back to main options */}
-              {organization && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    setOrganization(null);
-                    setUserRole('');
-                    setTokenId('');
-                    setAccessCode('');
-                    setInvitationToken('');
-                  }}
-                >
-                  Back to Options
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
           </Card>
+        </div>
+
+        {/* Right Side - Features */}
+        <div className="hidden lg:block space-y-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-8 space-y-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Why Choose E-Matdaan?</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">End-to-End Encryption</h3>
+                  <p className="text-sm text-gray-600">Your votes are encrypted and secure from start to finish</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Vote Verification</h3>
+                  <p className="text-sm text-gray-600">Verify your vote with unique receipts and QR codes</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Users className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Multi-Tenant Support</h3>
+                  <p className="text-sm text-gray-600">Support for multiple organizations and institutions</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Building className="w-4 h-4 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Easy Setup</h3>
+                  <p className="text-sm text-gray-600">Quick organization creation and member invitation</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-6 text-white">
+            <h3 className="text-lg font-semibold mb-2">Ready to get started?</h3>
+            <p className="text-blue-100 mb-4">Create your organization or join an existing one to begin secure digital voting.</p>
+                <Button 
+              variant="secondary" 
+                  className="w-full"
+              onClick={() => setActiveTab('create')}
+            >
+              Create Organization
+                </Button>
+            </div>
         </div>
       </div>
     </div>

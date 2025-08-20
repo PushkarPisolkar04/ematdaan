@@ -23,27 +23,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Set organization context for multi-tenant queries
-export const setOrganizationContext = async (organizationId: string) => {
-  try {
-    await supabase.rpc('set_organization_context', { org_id: organizationId });
-  } catch (error) {
-    console.error('Failed to set organization context:', error);
-  }
-};
-
-// Get current organization context
-export const getCurrentOrganization = async () => {
-  try {
-    const { data, error } = await supabase.rpc('get_current_organization');
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Failed to get organization context:', error);
-    return null;
-  }
-};
-
 // Helper function to handle API responses
 const handleApiResponse = async <T>(promise: Promise<{ data: T; error: any }>) => {
   try {
@@ -82,126 +61,6 @@ export const handleSupabaseError = (error: any) => {
   return error;
 };
 
-// Auth functions
-export const authApi = {
-  async signUp(email: string, password: string) {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            is_admin: true
-          }
-        }
-      });
-      if (error) throw handleSupabaseError(error);
-      return data;
-    } catch (error) {
-      throw handleSupabaseError(error);
-    }
-  },
-
-  async signIn(email: string, password: string) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw handleSupabaseError(error);
-      
-      // Store the session
-      if (data.session) {
-        localStorage.setItem('supabase.auth.token', data.session.access_token);
-      }
-      return data;
-    } catch (error) {
-      throw handleSupabaseError(error);
-    }
-  },
-
-  async signOut() {
-    localStorage.removeItem('supabase.auth.token');
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  },
-
-  async getSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
-  }
-};
-
-// Helper to check admin status
-export const isUserAdmin = async () => {
-  try {
-    // First check wallet address
-    const walletAddress = localStorage.getItem('wallet_address');
-    const adminAddress = import.meta.env.VITE_ADMIN_ADDRESS;
-    
-    if (!walletAddress || !adminAddress || walletAddress.toLowerCase() !== adminAddress.toLowerCase()) {
-      return false;
-    }
-
-    // Then check if we have a valid Supabase session
-    const session = await authApi.getSession();
-    return !!session;
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    return false;
-  }
-};
-
-// Set the current wallet address for RLS policies
-export const setCurrentWalletAddress = async (address: string) => {
-  try {
-    console.log('Setting wallet address:', address);
-    const { data, error } = await supabase.functions.invoke('set-wallet-address', {
-      body: { address: address.toLowerCase() }
-    });
-
-    if (error) {
-      console.error('Edge function error:', error);
-      throw error;
-    }
-
-    if (!data?.success) {
-      console.error('Function response:', data);
-      throw new Error(data?.message || 'Failed to set wallet address');
-    }
-
-    console.log('Wallet address set successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('Failed to set wallet address:', error);
-    throw error;
-  }
-};
-
-// Check if address is admin
-export const checkIsAdmin = async (address: string) => {
-  try {
-    console.log('Checking admin status for:', address);
-    const { data, error } = await supabase
-      .from('admin_addresses')
-      .select('address')
-      .eq('address', address.toLowerCase())
-      .single();
-
-    if (error) {
-      console.error('Admin check error:', error);
-      return false;
-    }
-
-    console.log('Admin check result:', data);
-    return !!data;
-  } catch (error) {
-    console.error('Failed to check admin status:', error);
-    return false;
-  }
-};
-
 interface ElectionCandidate {
   id: string;
   name: string;
@@ -215,22 +74,15 @@ interface DatabaseElection {
   name: string;
   start_time: string;
   end_time: string;
-  total_votes: number | null;
-  total_registered: number | null;
-  merkle_root?: string;
+  is_active: boolean;
+  organization_id: string;
   candidates: ElectionCandidate[];
 }
 
 // Election-related functions
 export const electionApi = {
-  async setSchedule(electionData: { name: string; startTime: string; endTime: string }) {
+  async setSchedule(electionData: { name: string; startTime: string; endTime: string; organizationId: string }) {
     try {
-      // Check if we have a valid session
-      const session = await authApi.getSession();
-      if (!session) {
-        throw new Error('Please sign in as admin first');
-      }
-
       // Validate dates
       const startDate = new Date(electionData.startTime);
       const endDate = new Date(electionData.endTime);
@@ -248,13 +100,14 @@ export const electionApi = {
         throw new Error('Start time cannot be more than 24 hours in the past');
       }
 
-      // Insert the election with authorization header
+      // Insert the election
       const { data: election, error: electionError } = await supabase
         .from('elections')
         .insert([{ 
           name: electionData.name,
           start_time: electionData.startTime,
           end_time: electionData.endTime,
+          organization_id: electionData.organizationId,
           is_active: true
         }])
         .select('*')
@@ -272,7 +125,7 @@ export const electionApi = {
     }
   },
 
-  async getSchedule() {
+  async getSchedule(organizationId: string) {
     try {
       const { data, error } = await supabase
         .from('elections')
@@ -284,7 +137,9 @@ export const electionApi = {
             party,
             symbol
           )
-        `);
+        `)
+        .eq('organization_id', organizationId)
+        .order('start_time', { ascending: false });
 
       if (error) {
         console.error('Get schedule error:', error);
@@ -298,7 +153,7 @@ export const electionApi = {
     }
   },
 
-  async getActiveElections() {
+  async getActiveElections(organizationId: string) {
     try {
       const now = new Date().toISOString();
       const { data, error } = await supabase
@@ -316,6 +171,7 @@ export const electionApi = {
             symbol
           )
         `)
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .gte('end_time', now);
 
@@ -335,30 +191,7 @@ export const electionApi = {
     }
   },
 
-  async getStats(): Promise<Array<{
-    election_id: string;
-    name: string;
-    start_time: string;
-    end_time: string;
-    registered_voters: number;
-    total_votes: number;
-    participation_rate: number;
-    avg_confirmation_time: number;
-    security_score: number;
-  }>> {
-    const { data: stats, error } = await supabase
-      .from('election_stats')
-      .select('*');
-
-    if (error) {
-      console.error('Error fetching stats:', error);
-      throw error;
-    }
-
-    return stats || [];
-  },
-
-  async getPastElections() {
+  async getPastElections(organizationId: string) {
     try {
       const now = new Date().toISOString();
       const { data: elections, error } = await supabase
@@ -367,6 +200,7 @@ export const electionApi = {
           *,
           candidates (*)
         `)
+        .eq('organization_id', organizationId)
         .or(`end_time.lt.${now},is_active.eq.true`)
         .order('end_time', { ascending: false });
 
@@ -386,10 +220,7 @@ export const electionApi = {
           .from('votes')
           .select('id', { count: 'exact', head: true })
           .eq('election_id', election.id);
-        // Live count of registered users
-        const { count: totalRegistered } = await supabase
-          .from('users')
-          .select('id', { count: 'exact', head: true });
+        
         // For each candidate, count votes
         const candidates = await Promise.all((election.candidates || []).map(async (candidate: ElectionCandidate) => {
           const { count: candidateVotes } = await supabase
@@ -406,15 +237,12 @@ export const electionApi = {
             percentage: (totalVotes || 0) > 0 ? Math.round(((candidateVotes || 0) / (totalVotes || 1)) * 100) : 0
           };
         }));
-        const turnoutPercentage = (totalRegistered || 0) > 0 ? (totalVotes || 0) / (totalRegistered || 1) * 100 : 0;
+        
         return {
           id: election.id,
           name: election.name,
           totalVotes: totalVotes || 0,
-          totalRegistered: totalRegistered || 0,
-          turnoutPercentage: Math.round(turnoutPercentage),
           candidates,
-          merkleRoot: election.merkle_root || '',
           electionPeriod: {
             start: election.start_time,
             end: election.end_time
@@ -433,12 +261,6 @@ export const electionApi = {
 export const candidateApi = {
   async add(candidate: { name: string; party: string; symbol: string; electionId: string }) {
     try {
-      // Check if we have a valid session
-      const session = await authApi.getSession();
-      if (!session) {
-        throw new Error('Please sign in as admin first');
-      }
-
       // First verify the election exists and is active
       const { data: election, error: electionError } = await supabase
         .from('elections')
@@ -478,12 +300,6 @@ export const candidateApi = {
 
   async remove(id: string) {
     try {
-      // Check if we have a valid session
-      const session = await authApi.getSession();
-      if (!session) {
-        throw new Error('Please sign in as admin first');
-      }
-
       const { error } = await supabase
         .from('candidates')
         .delete()
@@ -532,6 +348,113 @@ export const candidateApi = {
       return data;
     } catch (error) {
       console.error('Failed to get candidates:', error);
+      throw error;
+    }
+  }
+};
+
+// Voting functions
+export const votingApi = {
+  async castVote(voteData: { candidateId: string; electionId: string; userId: string }) {
+    try {
+      // Check if user has already voted in this election
+      const { data: existingVote, error: checkError } = await supabase
+        .from('votes')
+        .select('id')
+        .eq('user_id', voteData.userId)
+        .eq('election_id', voteData.electionId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingVote) {
+        throw new Error('You have already voted in this election');
+      }
+
+      // Create vote hash (in a real app, this would be more complex)
+      const voteHash = `${voteData.userId}-${voteData.electionId}-${Date.now()}`;
+
+      // Insert the vote
+      const { data, error } = await supabase
+        .from('votes')
+        .insert([{
+          candidate_id: voteData.candidateId,
+          user_id: voteData.userId,
+          election_id: voteData.electionId,
+          vote_hash: voteHash
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Vote casting error:', error);
+        throw new Error('Failed to cast vote. Please try again.');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Failed to cast vote:', error);
+      throw error;
+    }
+  },
+
+  async hasVoted(userId: string, electionId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('votes')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('election_id', electionId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Failed to check vote status:', error);
+      throw error;
+    }
+  },
+
+  async getVoteResults(electionId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('votes')
+        .select(`
+          candidate_id,
+          candidates (
+            id,
+            name,
+            party,
+            symbol
+          )
+        `)
+        .eq('election_id', electionId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Count votes per candidate
+      const voteCounts = data?.reduce((acc: any, vote) => {
+        const candidateId = vote.candidate_id;
+        if (!acc[candidateId]) {
+          acc[candidateId] = {
+            candidate: vote.candidates,
+            votes: 0
+          };
+        }
+        acc[candidateId].votes++;
+        return acc;
+      }, {});
+
+      return Object.values(voteCounts || {});
+    } catch (error) {
+      console.error('Failed to get vote results:', error);
       throw error;
     }
   }

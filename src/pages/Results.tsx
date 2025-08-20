@@ -1,410 +1,392 @@
-import { useState, useEffect } from "react";
-import { Trophy, Users, TrendingUp, BarChart3, PieChart, Calendar, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { electionApi } from "@/lib/supabase";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Trophy, Download, Share2, Users, Vote, TrendingUp } from 'lucide-react';
 
-interface ElectionResult {
+interface Candidate {
   id: string;
   name: string;
-  totalVotes: number;
-  totalRegistered: number;
-  turnoutPercentage: number;
-  candidates: Array<{
-    id: string;
-    name: string;
-    party: string;
-    symbol: string;
-    votes: number;
-    percentage: number;
-  }>;
-  merkleRoot: string;
-  electionPeriod: {
-    start: string;
-    end: string;
-  };
+  party?: string;
+  symbol?: string;
+  vote_count: number;
+  percentage: number;
 }
 
-const Results = () => {
-  const [pastElections, setPastElections] = useState<ElectionResult[]>([]);
-  const [selectedElection, setSelectedElection] = useState<ElectionResult | null>(null);
+interface Election {
+  id: string;
+  name: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+  organization_id: string;
+}
+
+interface ResultsData {
+  election: Election;
+  candidates: Candidate[];
+  totalVotes: number;
+  totalEligibleVoters: number;
+  participationRate: number;
+}
+
+const Results: React.FC = () => {
+  const { electionId } = useParams<{ electionId: string }>();
+  const { user, organization, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState<ResultsData | null>(null);
+  const [winner, setWinner] = useState<Candidate | null>(null);
 
   useEffect(() => {
-    const fetchPastElections = async () => {
-      try {
-        const elections = await electionApi.getPastElections();
-        setPastElections(elections);
-        if (elections.length > 0) {
-          setSelectedElection(elections[0]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch past elections:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!isAuthenticated) {
+      navigate('/auth');
+      return;
+    }
+    if (electionId) {
+      loadResults();
+    }
+  }, [isAuthenticated, electionId, user, organization]);
 
-    fetchPastElections();
-  }, []);
+  const loadResults = async () => {
+    if (!electionId || !organization) return;
+
+    try {
+      setLoading(true);
+
+      // Get election details
+      const { data: election, error: electionError } = await supabase
+        .from('elections')
+        .select('*')
+        .eq('id', electionId)
+        .eq('organization_id', organization.id)
+        .single();
+
+      if (electionError) {
+        throw new Error('Election not found');
+      }
+
+      // Get candidates with vote counts
+      const { data: candidates, error: candidatesError } = await supabase
+        .from('candidates')
+        .select(`
+          id,
+          name,
+          party,
+          symbol,
+          votes:votes(count)
+        `)
+        .eq('election_id', electionId);
+
+      if (candidatesError) {
+        throw candidatesError;
+      }
+
+      // Get total votes
+      const { count: totalVotes, error: voteCountError } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('election_id', electionId);
+
+      if (voteCountError) {
+        throw voteCountError;
+      }
+
+      // Get total eligible voters (organization members)
+      const { count: totalEligibleVoters, error: votersError } = await supabase
+        .from('user_organizations')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization.id)
+        .eq('is_active', true);
+
+      if (votersError) {
+        throw votersError;
+      }
+
+      // Process candidates data
+      const processedCandidates: Candidate[] = candidates?.map(candidate => {
+        const voteCount = candidate.votes?.[0]?.count || 0;
+        const percentage = totalVotes ? (voteCount / totalVotes) * 100 : 0;
+        
+        return {
+          id: candidate.id,
+          name: candidate.name,
+          party: candidate.party,
+          symbol: candidate.symbol,
+          vote_count: voteCount,
+          percentage: Math.round(percentage * 100) / 100
+        };
+      }).sort((a, b) => b.vote_count - a.vote_count) || [];
+
+      const participationRate = totalEligibleVoters ? (totalVotes / totalEligibleVoters) * 100 : 0;
+
+      const resultsData: ResultsData = {
+        election,
+        candidates: processedCandidates,
+        totalVotes: totalVotes || 0,
+        totalEligibleVoters: totalEligibleVoters || 0,
+        participationRate: Math.round(participationRate * 100) / 100
+      };
+
+      setResults(resultsData);
+      setWinner(processedCandidates[0] || null);
+
+    } catch (error) {
+      console.error('Failed to load results:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load election results",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    toast({
+      title: "Feature Coming Soon",
+      description: "PDF export functionality will be available soon"
+    });
+  };
+
+  const handleExportCSV = () => {
+    if (!results) return;
+
+    const csvContent = [
+      ['Candidate', 'Party', 'Votes', 'Percentage'],
+      ...results.candidates.map(candidate => [
+        candidate.name,
+        candidate.party || 'Independent',
+        candidate.vote_count.toString(),
+        `${candidate.percentage}%`
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${results.election.name}-results.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Successful",
+      description: "Results exported to CSV file"
+    });
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: `${results?.election.name} Results`,
+        text: `View the results for ${results?.election.name}`,
+        url: url
+      });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast({
+        title: "Link Copied",
+        description: "Results page link copied to clipboard"
+      });
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6B21E8] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading election results...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading results...</p>
         </div>
       </div>
     );
   }
 
-  if (pastElections.length === 0) {
+  if (!results) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 border-b border-border p-8">
-          <div className="container mx-auto text-center">
-            <h1 className="text-4xl font-bold mb-4">Election Results</h1>
-          </div>
-        </header>
-        
-        <div className="container mx-auto p-6">
-          <Card className="text-center p-8">
-            <CardContent>
-              <Clock className="h-12 w-12 text-[#6B21E8]/60 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Past Elections</h3>
-              <p className="text-muted-foreground">
-                There are no completed elections to display results for. Please check back after an election has ended.
-              </p>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Results Not Found</h1>
+          <Button onClick={() => navigate('/dashboard')}>
+            Return to Dashboard
+          </Button>
         </div>
       </div>
     );
   }
-
-  if (!selectedElection) return null;
-
-  // Add default values to prevent NaN
-  const totalVotes = selectedElection.totalVotes || 0;
-  const totalRegistered = selectedElection.totalRegistered || 0;
-  const notVoted = Math.max(0, totalRegistered - totalVotes);
-  const notVotedPercentage = totalRegistered > 0 ? (notVoted / totalRegistered) * 100 : 0;
-  const turnoutPercentage = totalRegistered > 0 ? (totalVotes / totalRegistered) * 100 : 0;
-
-  const winner = selectedElection.candidates && selectedElection.candidates.length > 0
-    ? selectedElection.candidates.reduce((prev, current) => 
-    prev.votes > current.votes ? prev : current
-      )
-    : null;
-
-  const isElectionLive = new Date() >= new Date(selectedElection.electionPeriod.start) && 
-                        new Date() <= new Date(selectedElection.electionPeriod.end);
-  const hasElectionEnded = new Date() > new Date(selectedElection.electionPeriod.end);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
-      <header className="bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 border-b border-border p-8">
-        <div className="container mx-auto text-center">
-          <h1 className="text-4xl font-bold mb-4 flex items-center justify-center gap-3">
-            <Trophy className="h-10 w-10 text-[#6B21E8]" />
-            Election Results
-          </h1>
-          
-          {pastElections.length > 1 && (
-            <Tabs 
-              defaultValue={selectedElection.id}
-              className="mt-6"
-              onValueChange={(value) => {
-                const election = pastElections.find(e => e.id === value);
-                if (election) setSelectedElection(election);
-              }}
-            >
-              <TabsList className="mx-auto">
-                {pastElections.map((election) => (
-                  <TabsTrigger
-                    key={election.id}
-                    value={election.id}
-                    className="data-[state=active]:bg-[#6B21E8] data-[state=active]:text-white"
-                  >
-                    {election.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{results.election.name}</h1>
+            <p className="text-gray-600 mt-1">{results.election.description}</p>
+          </div>
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            Results Finalized
+          </Badge>
+        </div>
 
-          <div className="flex items-center justify-center gap-4 mt-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              Election Period: {new Date(selectedElection.electionPeriod.start).toLocaleDateString()} - {new Date(selectedElection.electionPeriod.end).toLocaleDateString()}
-            </div>
-            <div className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              {totalVotes.toLocaleString()} votes cast
-            </div>
+        <div className="flex items-center space-x-6 text-sm text-gray-600">
+          <div className="flex items-center space-x-2">
+            <Vote className="h-4 w-4" />
+            <span>{results.totalVotes} votes cast</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Users className="h-4 w-4" />
+            <span>{results.totalEligibleVoters} eligible voters</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4" />
+            <span>{results.participationRate}% participation</span>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Winner Announcement */}
-        {winner && hasElectionEnded ? (
-          <Card className="border-2 border-[#6B21E8] bg-gradient-to-r from-[#6B21E8]/10 to-green/10">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold flex items-center justify-center gap-3">
-                <Trophy className="h-8 w-8 text-[#6B21E8]" />
-              Winner Declared
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="text-6xl mb-4">{winner.symbol}</div>
-            <h2 className="text-2xl font-bold mb-2">{winner.name}</h2>
-            <p className="text-lg text-muted-foreground mb-4">{winner.party}</p>
-            <div className="flex items-center justify-center gap-4">
-                <div className="text-3xl font-bold text-[#6B21E8]">
-                {winner.votes.toLocaleString()}
-              </div>
-              <div className="text-xl text-muted-foreground">
-                ({winner.percentage}% of votes)
+      {/* Winner Announcement */}
+      {winner && (
+        <Card className="mb-8 border-2 border-yellow-200 bg-yellow-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center space-x-4">
+              <Trophy className="h-12 w-12 text-yellow-600" />
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-900">{winner.name}</h2>
+                <p className="text-lg text-gray-600">
+                  {winner.vote_count} votes ({winner.percentage}%)
+                </p>
+                <Badge className="mt-2 bg-yellow-600 text-white">
+                  🏆 Winner
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
-        ) : (
-          <Card className="text-center p-8">
-            <CardContent>
-              <Clock className="h-12 w-12 text-[#6B21E8]/60 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">
-                {selectedElection.candidates.length === 0 
-                  ? "No Candidates"
-                  : isElectionLive 
-                    ? "Election in Progress"
-                    : "Election Not Started"}
-              </h3>
-              <p className="text-muted-foreground">
-                {selectedElection.candidates.length === 0 
-                  ? "No candidates have been added to this election."
-                  : isElectionLive
-                    ? "The election is currently in progress. Results will be declared after voting ends."
-                    : "The election has not started yet. Check back when voting begins."}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+      )}
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Votes Cast</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalVotes.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                Out of {totalRegistered.toLocaleString()} registered
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Voter Turnout</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{turnoutPercentage.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">
-                Participated in voting
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Did Not Vote</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{notVoted.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                {notVotedPercentage.toFixed(1)}% of registered voters
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Candidates</CardTitle>
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{selectedElection.candidates.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Participating in election
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Detailed Results */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-6 w-6" />
-              Candidate-wise Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {selectedElection.candidates
-                .sort((a, b) => b.votes - a.votes)
-                .map((candidate, index) => (
-                  <div key={candidate.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 flex items-center justify-center bg-[#6B21E8]/10 rounded-full">
-                            <span className="text-[#6B21E8]">{candidate.symbol}</span>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {index === 0 && <Trophy className="h-4 w-4 text-[#6B21E8]" />}
-                              <span className="font-semibold">{candidate.name}</span>
-                            </div>
-                            <div className="text-sm text-muted-foreground">{candidate.party}</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold">{candidate.votes.toLocaleString()}</div>
-                        <div className="text-sm text-muted-foreground">{candidate.percentage}%</div>
-                      </div>
-                    </div>
-                    <Progress value={candidate.percentage} className="h-3" />
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Voting Statistics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Results List */}
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Turnout Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Voted ({turnoutPercentage.toFixed(1)}%)</span>
-                    <span>{totalVotes.toLocaleString()}</span>
-                  </div>
-                  <Progress value={turnoutPercentage} className="h-2" />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Did Not Vote ({notVotedPercentage.toFixed(1)}%)</span>
-                    <span>{notVoted.toLocaleString()}</span>
-                  </div>
-                  <Progress value={notVotedPercentage} className="h-2 bg-red-100" />
-                </div>
-
-                <div className="pt-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    <strong>Total Registered:</strong> {totalRegistered.toLocaleString()} voters
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Vote Verification</CardTitle>
+              <CardTitle>Election Results</CardTitle>
+              <CardDescription>
+                All candidates ranked by vote count
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Merkle Root Hash</Label>
-                <div className="bg-muted p-3 rounded font-mono text-xs break-all mt-1">
-                  {selectedElection.merkleRoot}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <Label className="font-medium">Election Start</Label>
-                  <div className="text-muted-foreground">
-                    {new Date(selectedElection.electionPeriod.start).toLocaleString()}
+              {results.candidates.map((candidate, index) => (
+                <div key={candidate.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-medium">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">{candidate.name}</h3>
+                        {candidate.party && (
+                          <p className="text-sm text-gray-500">{candidate.party}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{candidate.vote_count} votes</p>
+                      <p className="text-sm text-gray-500">{candidate.percentage}%</p>
+                    </div>
                   </div>
+                  <Progress value={candidate.percentage} className="h-2" />
+                  {index < results.candidates.length - 1 && <Separator />}
                 </div>
-                <div>
-                  <Label className="font-medium">Election End</Label>
-                  <div className="text-muted-foreground">
-                    {new Date(selectedElection.electionPeriod.end).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-green-800 text-sm">
-                  ✓ All votes have been verified and counted using Merkle tree verification. 
-                  Results are stored securely in our database.
-                </p>
-              </div>
+              ))}
             </CardContent>
           </Card>
         </div>
 
-        {/* Additional Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Election Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-              <div>
-                <h4 className="font-semibold mb-2">Voting Process</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Secure email/password authentication</li>
-                  <li>• Vote encryption</li>
-                  <li>• One vote per registered user</li>
-                  <li>• Vote receipts with proofs</li>
-                </ul>
+        {/* Statistics & Actions */}
+        <div className="space-y-6">
+          {/* Participation Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Participation Statistics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Votes Cast</span>
+                  <span className="font-medium">{results.totalVotes}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Eligible Voters</span>
+                  <span className="font-medium">{results.totalEligibleVoters}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Participation Rate</span>
+                  <span className="font-medium">{results.participationRate}%</span>
+                </div>
+                <Progress value={results.participationRate} className="h-2 mt-2" />
               </div>
-              <div>
-                <h4 className="font-semibold mb-2">Security Features</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Secure database storage</li>
-                  <li>• Merkle tree verification</li>
-                  <li>• Vote integrity checks</li>
-                  <li>• Audit logging</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Transparency</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Real-time vote counting</li>
-                  <li>• Vote verification tools</li>
-                  <li>• Result validation</li>
-                  <li>• Database backups</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Export Options */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Export & Share</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={handleExportPDF} 
+                variant="outline" 
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button 
+                onClick={handleExportCSV} 
+                variant="outline" 
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download CSV
+              </Button>
+              <Button 
+                onClick={handleShare} 
+                variant="outline" 
+                className="w-full"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Results
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Button 
+              onClick={() => navigate('/dashboard')} 
+              className="w-full"
+            >
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
-
-const Label = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={`text-sm font-medium ${className}`}>{children}</div>
-);
 
 export default Results;

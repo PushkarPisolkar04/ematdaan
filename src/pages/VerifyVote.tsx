@@ -1,288 +1,530 @@
-import { useState, useEffect } from "react";
-import { CheckCircle, AlertCircle, Search, FileText, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useLocation } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { verifyVote } from "@/lib/api/voting";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Loader2, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  Download, 
+  Share2, 
+  Shield, 
+  FileText,
+  QrCode
+} from 'lucide-react';
 
-// Add a type for the verification result
-interface VerificationResult {
-  status: 'valid' | 'invalid';
-  votedFor?: string;
-  timestamp?: string;
-  electionId?: string;
-  merkleRoot?: string;
-  merkleProof?: {
-    root: string;
-    proof: string[];
-    leaf: string;
-    index: number;
+interface VoteRecord {
+  id: string;
+  vote_hash: string;
+  created_at: string;
+  candidate: {
+    id: string;
+    name: string;
+    party?: string;
+    symbol?: string;
+  };
+  election: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    email: string;
   };
 }
 
-const VerifyVote = () => {
-  const [receiptHash, setReceiptHash] = useState("");
-  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const location = useLocation();
+interface VerificationResult {
+  isValid: boolean;
+  status: 'verified' | 'invalid' | 'processing' | 'not_found';
+  message: string;
+  details: {
+    voteExists: boolean;
+    hashMatches: boolean;
+    electionValid: boolean;
+    userAuthorized: boolean;
+  };
+}
+
+const VerifyVote: React.FC = () => {
+  const { receipt } = useParams<{ receipt: string }>();
+  const { user, organization, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // If navigated from dashboard with receipt, auto-fill
-    if (location.state?.receipt) {
-      setReceiptHash(location.state.receipt);
-    }
-  }, [location]);
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [voteRecord, setVoteRecord] = useState<VoteRecord | null>(null);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
 
-  const handleVerifyVote = async () => {
-    if (!receiptHash.trim()) {
-      toast({
-        title: "Missing Receipt",
-        description: "Please enter your vote receipt hash",
-        variant: "destructive"
-      });
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/auth');
       return;
     }
+    if (receipt) {
+      loadVoteRecord();
+    }
+  }, [isAuthenticated, receipt, user, organization]);
 
-    setIsVerifying(true);
-    setVerificationResult(null);
+  const loadVoteRecord = async () => {
+    if (!receipt || !user || !organization) return;
+
     try {
-      const result: any = await verifyVote(receiptHash.trim());
-      if (result.status === 'valid') {
-        setVerificationResult({
-          status: 'valid',
-          votedFor: result.votedFor,
-          timestamp: result.timestamp,
-          electionId: result.electionId,
-          merkleRoot: result.merkleRoot,
-          merkleProof: result.merkleProof,
-        });
-        toast({
-          title: "✅ Vote Verified",
-          description: "Your vote is included in the Merkle Tree",
-        });
-      } else {
-        setVerificationResult({ status: 'invalid' });
-        toast({
-          title: "❌ Verification Failed",
-          description: "Vote not found or invalid receipt hash",
-          variant: "destructive"
-        });
-      }
+      setLoading(true);
+
+             // Try to find the vote record by hash (receipt ID)
+       const { data: vote, error: voteError } = await supabase
+         .from('votes')
+         .select(`
+           id,
+           vote_hash,
+           created_at,
+           candidates!inner(
+             id,
+             name,
+             party,
+             symbol
+           ),
+           elections!inner(
+             id,
+             name,
+             description
+           ),
+           auth_users!inner(
+             id,
+             name,
+             email
+           )
+         `)
+         .eq('vote_hash', receipt)
+         .eq('user_id', user.id)
+         .single();
+
+       if (voteError || !vote) {
+         setVerificationResult({
+           isValid: false,
+           status: 'not_found',
+           message: 'Vote record not found or you do not have permission to view this receipt.',
+           details: {
+             voteExists: false,
+             hashMatches: false,
+             electionValid: false,
+             userAuthorized: false
+           }
+         });
+         return;
+       }
+
+              // Transform the data to match our interface
+       const transformedVote: VoteRecord = {
+         id: vote.id,
+         vote_hash: vote.vote_hash,
+         created_at: vote.created_at,
+         candidate: Array.isArray(vote.candidates) ? vote.candidates[0] : vote.candidates,
+         election: Array.isArray(vote.elections) ? vote.elections[0] : vote.elections,
+         user: Array.isArray(vote.auth_users) ? vote.auth_users[0] : vote.auth_users
+       };
+
+       setVoteRecord(transformedVote);
+       await verifyVote(transformedVote);
+
     } catch (error) {
-      setVerificationResult({ status: 'invalid' });
+      console.error('Failed to load vote record:', error);
       toast({
-        title: "❌ Verification Failed",
-        description: error instanceof Error ? error.message : "Vote not found or invalid receipt hash",
+        title: "Error",
+        description: "Failed to load vote record",
         variant: "destructive"
       });
+      setVerificationResult({
+        isValid: false,
+        status: 'invalid',
+        message: 'An error occurred while loading the vote record.',
+        details: {
+          voteExists: false,
+          hashMatches: false,
+          electionValid: false,
+          userAuthorized: false
+        }
+      });
+    } finally {
+      setLoading(false);
     }
-    setIsVerifying(false);
   };
 
-  return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="container mx-auto max-w-4xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-4 flex items-center justify-center gap-2">
-            <Shield className="h-8 w-8 text-primary" />
-            Vote Verification
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            Verify that your vote was counted correctly using Merkle tree verification
-          </p>
+  const verifyVote = async (vote: VoteRecord) => {
+    try {
+      setVerifying(true);
+
+      // Perform verification checks
+      const voteExists = !!vote;
+      const hashMatches = vote.vote_hash === receipt;
+      const userAuthorized = vote.user.id === user?.id;
+
+      // Check if election is valid and from the same organization
+      const { data: election, error: electionError } = await supabase
+        .from('elections')
+        .select('organization_id')
+        .eq('id', vote.election.id)
+        .single();
+
+      const electionValid = !electionError && election?.organization_id === organization?.id;
+
+      const isValid = voteExists && hashMatches && electionValid && userAuthorized;
+
+      let status: VerificationResult['status'] = 'verified';
+      let message = 'Vote successfully verified! Your vote is valid and has been counted.';
+
+      if (!isValid) {
+        status = 'invalid';
+        if (!voteExists) {
+          message = 'Vote record not found in the database.';
+        } else if (!hashMatches) {
+          message = 'Vote hash does not match the receipt ID.';
+        } else if (!userAuthorized) {
+          message = 'You are not authorized to view this vote record.';
+        } else if (!electionValid) {
+          message = 'Election is not valid or does not belong to your organization.';
+        } else {
+          message = 'Vote verification failed. The vote may have been tampered with.';
+        }
+      }
+
+      setVerificationResult({
+        isValid,
+        status,
+        message,
+        details: {
+          voteExists,
+          hashMatches,
+          electionValid,
+          userAuthorized
+        }
+      });
+
+    } catch (error) {
+      console.error('Verification failed:', error);
+      setVerificationResult({
+        isValid: false,
+        status: 'invalid',
+        message: 'An error occurred during verification.',
+        details: {
+          voteExists: false,
+          hashMatches: false,
+          electionValid: false,
+          userAuthorized: false
+        }
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleDownloadReceipt = () => {
+    if (!voteRecord) return;
+
+    const receiptData = {
+      receiptId: voteRecord.vote_hash,
+      electionName: voteRecord.election.name,
+      candidateName: voteRecord.candidate.name,
+      voterName: voteRecord.user.name,
+      voteTime: new Date(voteRecord.created_at).toLocaleString(),
+      verificationStatus: verificationResult?.isValid ? 'Verified' : 'Invalid'
+    };
+
+    const content = `
+VOTE RECEIPT
+============
+
+Receipt ID: ${receiptData.receiptId}
+Election: ${receiptData.electionName}
+Candidate: ${receiptData.candidateName}
+Voter: ${receiptData.voterName}
+Vote Time: ${receiptData.voteTime}
+Status: ${receiptData.verificationStatus}
+
+This receipt serves as proof of your vote submission.
+Keep this receipt for your records.
+
+Generated on: ${new Date().toLocaleString()}
+    `.trim();
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `vote-receipt-${voteRecord.vote_hash.slice(-8)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Receipt Downloaded",
+      description: "Vote receipt has been downloaded successfully"
+    });
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Vote Verification Receipt',
+        text: `Verify my vote for ${voteRecord?.election.name}`,
+        url: url
+      });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast({
+        title: "Link Copied",
+        description: "Verification link copied to clipboard"
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading vote record...</p>
         </div>
+      </div>
+    );
+  }
 
-        {/* Input Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-6 w-6" />
-              Enter Vote Receipt
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="receipt">Vote Receipt Hash</Label>
-              <Input
-                id="receipt"
-                placeholder="Enter your vote receipt hash (e.g., vote_1234567890_abcdef)"
-                value={receiptHash}
-                onChange={(e) => setReceiptHash(e.target.value)}
-                className="font-mono"
-              />
-              <p className="text-sm text-muted-foreground">
-                This is the unique hash you received after casting your vote
-              </p>
-            </div>
-            
-            <Button 
-              onClick={handleVerifyVote} 
-              disabled={isVerifying}
-              className="w-full bg-saffron hover:bg-saffron/90"
-            >
-              {isVerifying ? (
-                <>
-                  <AlertCircle className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying Vote...
-                </>
+  if (!voteRecord && verificationResult?.status === 'not_found') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Vote Record Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The vote record you're looking for could not be found, or you don't have permission to view it.
+          </p>
+          <Button onClick={() => navigate('/dashboard')}>
+            Return to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Header */}
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Vote Verification</h1>
+        <p className="text-gray-600">Receipt ID: {receipt}</p>
+      </div>
+
+      {/* Verification Status */}
+      <div className="mb-8">
+        <Card className={`border-2 ${
+          verificationResult?.isValid 
+            ? 'border-green-200 bg-green-50' 
+            : verificationResult?.status === 'processing'
+            ? 'border-yellow-200 bg-yellow-50'
+            : 'border-red-200 bg-red-50'
+        }`}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center space-x-4 mb-4">
+              {verifying ? (
+                <Loader2 className="h-12 w-12 animate-spin text-yellow-600" />
+              ) : verificationResult?.isValid ? (
+                <CheckCircle className="h-12 w-12 text-green-600" />
+              ) : verificationResult?.status === 'processing' ? (
+                <Clock className="h-12 w-12 text-yellow-600" />
               ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Verify Vote
-                </>
+                <XCircle className="h-12 w-12 text-red-600" />
               )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Results Section */}
-        {verificationResult && (
-          <Card className={`border-2 ${
-            verificationResult.status === 'valid' 
-              ? 'border-green-200 bg-green-50' 
-              : 'border-red-200 bg-red-50'
-          }`}>
-            <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${
-                verificationResult.status === 'valid' ? 'text-green-800' : 'text-red-800'
-              }`}>
-                {verificationResult.status === 'valid' ? (
-                  <>
-                    <CheckCircle className="h-6 w-6" />
-                    ✅ Vote Verified Successfully
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-6 w-6" />
-                    ❌ Vote Not Found
-                  </>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {verificationResult.status === 'valid' ? (
-                <div className="space-y-6">
-                  <div className={`p-4 rounded-lg bg-green-100 border border-green-200`}>
-                    <p className="text-green-800 font-medium">
-                      Your vote is included in the Merkle Tree and has been counted correctly.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg">Vote Details</h3>
-                      <div className="space-y-2">
-                        <div>
-                          <Label className="text-sm font-medium">Voted For</Label>
-                          <div className="bg-background p-3 rounded border">
-                            {verificationResult.votedFor || 'Encrypted (private)'}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Timestamp</Label>
-                          <div className="bg-background p-3 rounded border font-mono text-sm">
-                            {verificationResult.timestamp ? new Date(verificationResult.timestamp).toLocaleString() : ''}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Election ID</Label>
-                          <div className="bg-background p-3 rounded border font-mono text-sm">
-                            {verificationResult.electionId || ''}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg">Vote Verification Proof</h3>
-                      <div className="space-y-2">
-                        <div>
-                          <Label className="text-sm font-medium">Merkle Root</Label>
-                          <div className="bg-background p-3 rounded border font-mono text-xs break-all">
-                            {verificationResult.merkleRoot}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Merkle Proof Path</Label>
-                          <div className="bg-background p-3 rounded border space-y-1">
-                            {verificationResult.merkleProof && Array.isArray(verificationResult.merkleProof.proof) ? verificationResult.merkleProof.proof.map((proof, index) => (
-                              <div key={index} className="font-mono text-xs break-all">
-                                {index + 1}. {proof}
-                              </div>
-                            )) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-800 mb-2">Vote Verification Status</h4>
-                    <p className="text-blue-700 text-sm">
-                      The Merkle root hash matches the expected value, confirming that your vote 
-                      has been correctly recorded in the database.
-                    </p>
-                  </div>
-                </div>
-              ) :
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg bg-red-100 border border-red-200">
-                    <p className="text-red-800 font-medium">
-                      The provided receipt hash was not found in our records.
-                    </p>
-                  </div>
-                  
-                  <div className="text-sm text-red-700">
-                    <h4 className="font-semibold mb-2">Possible reasons:</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Incorrect receipt hash entered</li>
-                      <li>Vote has not been processed yet</li>
-                      <li>Receipt hash has been corrupted</li>
-                      <li>Vote was submitted but failed validation</li>
-                    </ul>
-                  </div>
-                </div>
-              }
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Help Section */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-6 w-6" />
-              Need Help?
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-              <div>
-                <h4 className="font-semibold mb-2">Where to find your receipt?</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Check your voter dashboard</li>
-                  <li>• Look for the confirmation email</li>
-                  <li>• Screenshot taken after voting</li>
-                  <li>• Saved browser notification</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Still having issues?</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Contact support team</li>
-                  <li>• Provide your email address</li>
-                  <li>• Include timestamp of your vote</li>
-                  <li>• Available 24/7 during voting period</li>
-                </ul>
+              <div className="text-center">
+                <h2 className="text-xl font-bold">
+                  {verifying ? 'Verifying...' : 
+                   verificationResult?.isValid ? '✅ Vote Verified' :
+                   verificationResult?.status === 'processing' ? '⏳ Processing' :
+                   '❌ Verification Failed'}
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {verificationResult?.message}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {voteRecord && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Receipt Details */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Receipt Details</span>
+                </CardTitle>
+                <CardDescription>
+                  Detailed information about your vote
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Election</label>
+                    <p className="font-medium">{voteRecord.election.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Vote Time</label>
+                    <p className="font-medium">
+                      {new Date(voteRecord.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Selected Candidate</label>
+                  <div className="flex items-center space-x-3 mt-1">
+                    {voteRecord.candidate.symbol && (
+                      <div className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full">
+                        <span className="text-lg">{voteRecord.candidate.symbol}</span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium">{voteRecord.candidate.name}</p>
+                      {voteRecord.candidate.party && (
+                        <p className="text-sm text-gray-500">{voteRecord.candidate.party}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Voter Information</label>
+                  <p className="font-medium">{voteRecord.user.name}</p>
+                  <p className="text-sm text-gray-500">{voteRecord.user.email}</p>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Receipt Hash</label>
+                  <div className="bg-gray-50 p-3 rounded-md mt-1">
+                    <code className="text-xs font-mono break-all">
+                      {voteRecord.vote_hash}
+                    </code>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Verification Details & Actions */}
+          <div className="space-y-6">
+            {/* Verification Details */}
+            {verificationResult && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield className="h-5 w-5" />
+                    <span>Verification Details</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Vote Exists</span>
+                      {verificationResult.details.voteExists ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Hash Matches</span>
+                      {verificationResult.details.hashMatches ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Election Valid</span>
+                      {verificationResult.details.electionValid ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>User Authorized</span>
+                      {verificationResult.details.userAuthorized ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* QR Code Placeholder */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <QrCode className="h-5 w-5" />
+                  <span>QR Code</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center h-32 bg-gray-50 rounded-md">
+                  <div className="text-center text-gray-500">
+                    <QrCode className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-sm">QR Code</p>
+                    <p className="text-xs">Feature coming soon</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Actions */}
+            <div className="space-y-3">
+              <Button 
+                onClick={handleDownloadReceipt} 
+                variant="outline" 
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Receipt
+              </Button>
+              <Button 
+                onClick={handleShare} 
+                variant="outline" 
+                className="w-full"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Receipt
+              </Button>
+              <Button 
+                onClick={() => navigate('/dashboard')} 
+                className="w-full"
+              >
+                Return to Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

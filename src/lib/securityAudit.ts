@@ -27,6 +27,8 @@ export type SecurityActionType =
   | 'vote_cast'
   | 'vote_change'
   | 'vote_verification'
+  | 'fraud_vote_attempt'
+  | 'fraud_detection'
   | 'admin_action'
   | 'data_export'
   | 'security_breach_attempt'

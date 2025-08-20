@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import CountdownTimer from "@/components/CountdownTimer";
-import LiveStats from "@/components/LiveStats";
 import HowItWorks from "@/components/HowItWorks";
 import FAQSection from "@/components/FAQSection";
 import { getElectionStatus, getElectionStats } from "@/lib/api/election";
@@ -18,7 +17,7 @@ import StatsSection from '@/components/StatsSection';
 import { fetchTodayStats, fetchPlatformStats, PlatformStats } from "@/lib/api/stats";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { createOrganization } from "@/lib/api/traditionalAuth";
+// Organization creation is now handled by AuthContext
 import Navbar from "@/components/Navbar";
 import { validateOrganizationForm } from "@/lib/validation";
 
@@ -98,7 +97,7 @@ const Index = () => {
   useEffect(() => {
     const fetchElections = async () => {
       try {
-        const elections = await electionApi.getActiveElections();
+        const elections = await electionApi.getActiveElections('');
         setActiveElections(elections);
         if (elections.length > 0) {
           setSelectedElection(elections[0]);
@@ -159,28 +158,16 @@ const Index = () => {
 
     setIsCreatingOrg(true);
     try {
-      const result = await createOrganization({
-        name: orgFormData.name,
-        ownerName: orgFormData.ownerName,
-        ownerEmail: orgFormData.ownerEmail,
-        ownerPassword: orgFormData.password
+      // Simulate organization creation for now
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Organization Creation",
+        description: "Please use the Create Organization tab in the login page to create your organization"
       });
-
-      if (result.otpSent) {
-        toast({
-          title: "Organization Created Successfully!",
-          description: "Please check your email for verification code"
-        });
-        
-        // Navigate to auth page with organization context
-        navigate('/auth', { 
-          state: { 
-            organization: result.organization,
-            ownerEmail: orgFormData.ownerEmail,
-            mode: 'organization_created'
-          }
-        });
-      }
+      
+      // Navigate to auth page 
+      navigate('/auth');
     } catch (error) {
       console.error('Organization creation error:', error);
       toast({

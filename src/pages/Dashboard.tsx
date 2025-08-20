@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Vote, 
   Clock, 
@@ -17,7 +18,6 @@ import {
   Target,
   HelpCircle
 } from 'lucide-react';
-import { validateSession } from '@/lib/api/traditionalAuth';
 import { supabase } from '@/lib/supabase';
 
 interface Election {
@@ -40,8 +40,6 @@ interface UserStats {
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [organization, setOrganization] = useState<any>(null);
   const [elections, setElections] = useState<Election[]>([]);
   const [stats, setStats] = useState<UserStats>({
     totalElections: 0,
@@ -51,63 +49,38 @@ const Dashboard = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, organization, userRole, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    checkAuthAndLoadData();
-  }, []);
-
-  const checkAuthAndLoadData = async () => {
-    try {
-      const sessionToken = localStorage.getItem('session_token');
-      if (!sessionToken) {
-        navigate('/auth');
-        return;
-      }
-
-      const session = await validateSession(sessionToken);
-      if (!session) {
-        localStorage.clear();
-        navigate('/auth');
-        return;
-      }
-
-      const organizationId = localStorage.getItem('organization_id');
-      if (!organizationId) {
-        navigate('/auth');
-        return;
-      }
-
-      setUser(session);
-      await loadOrganizationData(organizationId);
-      await loadElections(organizationId, session.user_id);
-      await loadStats(organizationId, session.user_id);
-    } catch (error) {
-      console.error('Auth check failed:', error);
+    if (!isAuthenticated) {
       navigate('/auth');
+      return;
+    }
+    loadDashboardData();
+  }, [isAuthenticated, user, organization]);
+
+  const loadDashboardData = async () => {
+    if (!user || !organization) return;
+    
+    try {
+      setIsLoading(true);
+      await loadElections();
+      await loadStats();
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadOrganizationData = async (organizationId: string) => {
+  const loadElections = async () => {
     try {
-      const { data: org, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', organizationId)
-        .single();
-
-      if (error) throw error;
-      setOrganization(org);
-    } catch (error) {
-      console.error('Failed to load organization:', error);
-    }
-  };
-
-  const loadElections = async (organizationId: string, userId: string) => {
-    try {
-      // Get all elections for the organization
-      const { data: electionsData, error: electionsError } = await supabase
+      const { data: electionsData, error } = await supabase
         .from('elections')
         .select(`
           id,
@@ -115,93 +88,63 @@ const Dashboard = () => {
           start_time,
           end_time,
           is_active,
-          total_votes,
-          candidates(count)
+          candidates (id)
         `)
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organization?.id)
         .order('start_time', { ascending: false });
 
-      if (electionsError) throw electionsError;
+      if (error) throw error;
 
-      // Get user's voting history
-      const { data: votesData, error: votesError } = await supabase
+      // Check which elections the user has voted in
+      const { data: userVotes, error: votesError } = await supabase
         .from('votes')
         .select('election_id')
-        .eq('organization_id', organizationId)
-        .eq('voter_id', userId);
+        .eq('user_id', user?.id);
 
       if (votesError) throw votesError;
 
-      const votedElectionIds = new Set(votesData?.map(vote => vote.election_id) || []);
+      const votedElectionIds = new Set(userVotes?.map(vote => vote.election_id) || []);
 
-      // Combine election data with voting status
-      const electionsWithVoteStatus = electionsData?.map(election => ({
-        ...election,
-        candidates_count: election.candidates?.[0]?.count || 0,
+      const processedElections = electionsData?.map(election => ({
+        id: election.id,
+        name: election.name,
+        start_time: election.start_time,
+        end_time: election.end_time,
+        is_active: election.is_active,
+        total_votes: 0, // Will be calculated separately
+        candidates_count: election.candidates?.length || 0,
         has_voted: votedElectionIds.has(election.id)
       })) || [];
 
-      setElections(electionsWithVoteStatus);
+      setElections(processedElections);
     } catch (error) {
       console.error('Failed to load elections:', error);
+      throw error;
     }
   };
 
-  const loadStats = async (organizationId: string, userId: string) => {
+  const loadStats = async () => {
     try {
-      // Get total elections
-      const { count: totalElections } = await supabase
-        .from('elections')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId);
-
-      // Get user's participated elections
-      const { count: participatedElections } = await supabase
-        .from('votes')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('voter_id', userId);
-
-      // Get upcoming elections
-      const { count: upcomingElections } = await supabase
-        .from('elections')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .gt('start_time', new Date().toISOString());
-
-      // Get active elections
-      const { count: activeElections } = await supabase
-        .from('elections')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .lte('start_time', new Date().toISOString())
-        .gte('end_time', new Date().toISOString());
+      const now = new Date().toISOString();
+      
+      const totalElections = elections.length;
+      const participatedElections = elections.filter(e => e.has_voted).length;
+      const activeElections = elections.filter(e => 
+        e.is_active && new Date(e.start_time) <= new Date(now) && new Date(e.end_time) >= new Date(now)
+      ).length;
+      const upcomingElections = elections.filter(e => 
+        new Date(e.start_time) > new Date(now)
+      ).length;
 
       setStats({
-        totalElections: totalElections || 0,
-        participatedElections: participatedElections || 0,
-        upcomingElections: upcomingElections || 0,
-        activeElections: activeElections || 0
+        totalElections,
+        participatedElections,
+        upcomingElections,
+        activeElections
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
-    }
-  };
-
-  const getElectionStatus = (election: Election) => {
-    const now = new Date();
-    const startTime = new Date(election.start_time);
-    const endTime = new Date(election.end_time);
-
-    if (now < startTime) {
-      return { status: 'upcoming', color: 'bg-yellow-500', text: 'Upcoming', icon: Clock };
-    } else if (now >= startTime && now <= endTime && election.is_active) {
-      return { status: 'active', color: 'bg-green-500', text: 'Active', icon: Vote };
-    } else if (election.has_voted) {
-      return { status: 'voted', color: 'bg-blue-500', text: 'Voted', icon: CheckCircle };
-    } else {
-      return { status: 'ended', color: 'bg-gray-500', text: 'Ended', icon: XCircle };
+      throw error;
     }
   };
 
@@ -213,9 +156,23 @@ const Dashboard = () => {
     navigate(`/results/${electionId}`);
   };
 
+  const getElectionStatus = (election: Election) => {
+    const now = new Date();
+    const startTime = new Date(election.start_time);
+    const endTime = new Date(election.end_time);
+
+    if (now < startTime) {
+      return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-100 text-blue-800' };
+    } else if (now >= startTime && now <= endTime) {
+      return { status: 'active', label: 'Active', color: 'bg-green-100 text-green-800' };
+    } else {
+      return { status: 'ended', label: 'Ended', color: 'bg-gray-100 text-gray-800' };
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
@@ -225,257 +182,170 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <Badge variant="secondary">
-                {organization?.name}
-              </Badge>
-              <Badge variant="outline">
-                {user.role === 'org_owner' ? 'Owner' : user.role}
-              </Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              {user.role === 'org_owner' || user.role === 'admin' ? (
-                <Button onClick={() => navigate('/admin')}>
-                  Admin Panel
-                </Button>
-              ) : null}
-              <Button variant="outline" onClick={() => navigate('/profile')}>
-                Profile
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-gray-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
+        {/* Header */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {user.name || user.email}!
-          </h2>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {user?.name}!
+          </h1>
           <p className="text-gray-600">
-            Here's what's happening in your organization
+            {organization?.name} • {userRole === 'admin' ? 'Administrator' : 'Student'}
           </p>
         </div>
-
-        {/* Voter Guidance Section */}
-        <Card className="mb-8 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-xl text-green-800">
-              <Target className="h-6 w-6" />
-              How to Vote
-            </CardTitle>
-            <CardDescription>
-              Quick guide to participate in elections
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold text-sm mb-2 text-green-800">Voting Steps:</h4>
-                <div className="space-y-1 text-xs">
-                  <p>• Look for "Active" elections below</p>
-                  <p>• Click "Vote Now" to participate</p>
-                  <p>• Select your preferred candidate</p>
-                  <p>• Submit and save your receipt</p>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold text-sm mb-2 text-blue-800">Status Guide:</h4>
-                <div className="space-y-1 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span><strong>Active:</strong> Voting open</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span><strong>Upcoming:</strong> Starting soon</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span><strong>Voted:</strong> Already participated</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-700">
-                <strong>Remember:</strong> You can only vote once per election. Save your receipt for verification.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Elections</CardTitle>
-              <Vote className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalElections}</div>
-              <p className="text-xs text-muted-foreground">
-                All time elections
-              </p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Elections</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalElections}</p>
+                </div>
+                <Calendar className="h-8 w-8 text-blue-600" />
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Participated</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.participatedElections}</div>
-              <p className="text-xs text-muted-foreground">
-                Elections you voted in
-              </p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Participated</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.participatedElections}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.upcomingElections}</div>
-              <p className="text-xs text-muted-foreground">
-                Elections starting soon
-              </p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.activeElections}</p>
+                </div>
+                <Vote className="h-8 w-8 text-orange-600" />
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Now</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeElections}</div>
-              <p className="text-xs text-muted-foreground">
-                Currently running
-              </p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Upcoming</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.upcomingElections}</p>
+                </div>
+                <Clock className="h-8 w-8 text-purple-600" />
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Elections Section */}
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-2xl font-bold text-gray-900">Elections</h3>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                View All
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">Elections</h2>
+            {userRole === 'admin' && (
+              <Button onClick={() => navigate('/admin')}>
+                Manage Elections
               </Button>
-            </div>
+            )}
           </div>
 
           {elections.length === 0 ? (
             <Card>
-              <CardContent className="text-center py-12">
-                <Vote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">No Elections Available</h4>
+              <CardContent className="p-8 text-center">
+                <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Elections Found</h3>
                 <p className="text-gray-600 mb-4">
-                  There are no elections available for voting at the moment.
+                  {userRole === 'admin' 
+                    ? 'Create your first election to get started.'
+                    : 'No elections are currently available.'
+                  }
                 </p>
-                <Button variant="outline">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Check Back Later
-                </Button>
+                {userRole === 'admin' && (
+                  <Button onClick={() => navigate('/admin')}>
+                    Create Election
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {elections.map((election) => {
                 const status = getElectionStatus(election);
-                const StatusIcon = status.icon;
+                const isActive = status.status === 'active';
+                const canVote = isActive && !election.has_voted && userRole === 'student';
+                const hasEnded = status.status === 'ended';
 
                 return (
                   <Card key={election.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{election.name}</CardTitle>
-                        <Badge 
-                          variant={status.status === 'active' ? 'default' : 'secondary'}
-                          className={status.color}
-                        >
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {status.text}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{election.name}</CardTitle>
+                          <CardDescription>
+                            {election.candidates_count} candidates
+                          </CardDescription>
+                        </div>
+                        <Badge className={status.color}>
+                          {status.label}
                         </Badge>
                       </div>
-                      <CardDescription>
-                        {election.name}
-                      </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Start:</span>
-                          <span>{new Date(election.start_time).toLocaleDateString()}</span>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span>Start: {new Date(election.start_time).toLocaleDateString()}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">End:</span>
-                          <span>{new Date(election.end_time).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Candidates:</span>
-                          <span>{election.candidates_count}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Total Votes:</span>
-                          <span>{election.total_votes}</span>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Clock className="h-4 w-4 mr-2" />
+                          <span>End: {new Date(election.end_time).toLocaleDateString()}</span>
                         </div>
                       </div>
 
+                      {election.has_voted && (
+                        <div className="flex items-center text-sm text-green-600">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          <span>You have voted</span>
+                        </div>
+                      )}
+
                       <div className="flex space-x-2">
-                        {status.status === 'active' && !election.has_voted && (
+                        {canVote && (
                           <Button 
                             onClick={() => handleVote(election.id)}
                             className="flex-1"
                           >
+                            <Vote className="h-4 w-4 mr-2" />
                             Vote Now
-                            <ArrowRight className="h-4 w-4 ml-2" />
                           </Button>
                         )}
                         
-                        {status.status === 'voted' && (
+                        {hasEnded && (
                           <Button 
                             variant="outline"
                             onClick={() => handleViewResults(election.id)}
                             className="flex-1"
                           >
+                            <BarChart3 className="h-4 w-4 mr-2" />
                             View Results
                           </Button>
                         )}
-                        
-                        {status.status === 'ended' && (
+
+                        {election.has_voted && !hasEnded && (
                           <Button 
                             variant="outline"
-                            onClick={() => handleViewResults(election.id)}
                             className="flex-1"
-                          >
-                            View Results
-                          </Button>
-                        )}
-                        
-                        {status.status === 'upcoming' && (
-                          <Button 
-                            variant="outline"
                             disabled
-                            className="flex-1"
                           >
-                            Coming Soon
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Already Voted
                           </Button>
                         )}
                       </div>
@@ -488,32 +358,44 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-12">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>
-                Common tasks and shortcuts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <User className="h-4 w-4" />
-                  <span>View Profile</span>
-                </Button>
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Voting History</span>
-                </Button>
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>Election Calendar</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {userRole === 'admin' && (
+          <div className="mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>Manage your organization and elections</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/admin')}
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <Calendar className="h-6 w-6" />
+                    <span>Manage Elections</span>
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/admin?tab=members')}
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <User className="h-6 w-6" />
+                    <span>Manage Members</span>
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/admin?tab=results')}
+                    className="h-20 flex flex-col items-center justify-center space-y-2"
+                  >
+                    <BarChart3 className="h-6 w-6" />
+                    <span>View Results</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

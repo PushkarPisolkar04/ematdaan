@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Menu, X, User, FileText, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -13,57 +13,31 @@ import {
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userData, setUserData] = useState<any>(null);
   const [showAccessCodeModal, setShowAccessCodeModal] = useState(false);
   const [accessCode, setAccessCode] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-
-  // Check authentication status
-  useEffect(() => {
-    const checkAuth = () => {
-      const sessionToken = localStorage.getItem('session_token');
-      const isAuth = localStorage.getItem('isAuthenticated');
-      
-      if (sessionToken && isAuth === 'true') {
-        setIsAuthenticated(true);
-        // Get user data from localStorage
-        const userEmail = localStorage.getItem('user_email');
-        const userName = localStorage.getItem('user_name');
-        setUserData({
-          email: userEmail,
-          name: userName
-        });
-      } else {
-        setIsAuthenticated(false);
-        setUserData(null);
-      }
-    };
-
-    checkAuth();
-    // Check auth status periodically
-    const interval = setInterval(checkAuth, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  const { user, organization, userRole, isAuthenticated, logout } = useAuth();
 
   const handleLogin = () => {
       navigate('/auth');
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    setIsAuthenticated(false);
-    setUserData(null);
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out"
-    });
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out"
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleAccessCodeSubmit = () => {
@@ -178,7 +152,7 @@ export default function Navbar() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="flex items-center space-x-2 border-gray-300 hover:border-[#6B21E8] hover:bg-[#6B21E8]/5">
                       <User className="h-4 w-4" />
-                      <span className="text-gray-700">{userData?.name || userData?.email || 'User'}</span>
+                      <span className="text-gray-700">{user?.name || user?.email || 'User'}</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56" title="User Menu">
@@ -186,6 +160,12 @@ export default function Navbar() {
                       <User className="h-4 w-4 mr-2" />
                       Dashboard
                     </DropdownMenuItem>
+                    {userRole === 'admin' && (
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Admin Panel
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
                       <User className="h-4 w-4 mr-2" />
                       Profile Settings
@@ -223,22 +203,20 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile menu button */}
             <div className="lg:hidden">
               <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <Button variant="ghost" size="sm" className="p-2">
                     <Menu className="h-6 w-6" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] sm:w-[400px]" title="Mobile Menu">
+                <SheetContent side="right" className="w-80">
                   <div className="flex flex-col h-full">
                     {/* Mobile Logo */}
                     <div className="flex items-center space-x-3 mb-8">
-                      <Link to="/" onClick={handleLogoClick} className="flex items-center space-x-3">
-                        <img src="/logo.png" alt="E-Matdaan" className="h-10 w-auto" />
-                        <span className="text-xl font-bold text-gray-900">E-Matdaan</span>
-                      </Link>
+                      <img src="/logo.png" alt="E-Matdaan" className="h-8 w-auto" />
+                      <span className="text-xl font-bold text-gray-900">E-Matdaan</span>
                     </div>
 
                     {/* Mobile Navigation */}
@@ -247,78 +225,104 @@ export default function Navbar() {
                         <Link 
                           key={item.label}
                           to={item.href}
-                          onClick={item.onClick}
-                          className="block px-4 py-3 text-lg font-medium text-gray-700 hover:text-[#6B21E8] hover:bg-[#6B21E8]/5 rounded-lg transition-all duration-200"
+                          onClick={() => {
+                            if (item.onClick) item.onClick({} as React.MouseEvent<HTMLAnchorElement>);
+                            setIsMenuOpen(false);
+                          }}
+                          className="block px-4 py-3 text-gray-700 hover:text-[#6B21E8] hover:bg-[#6B21E8]/5 rounded-lg transition-all duration-200 font-medium"
                         >
                           {item.label}
                         </Link>
                       ))}
                     </nav>
 
-                    {/* Mobile Auth */}
-                    <div className="border-t border-gray-200 pt-6">
+                    {/* Mobile Auth Section */}
+                    <div className="border-t border-gray-200 pt-6 space-y-3">
                       {isAuthenticated ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
-                            <User className="h-6 w-6 text-gray-600" />
-                            <div>
-                              <p className="font-medium text-gray-900">{userData?.name || 'User'}</p>
-                              <p className="text-sm text-gray-600">{userData?.email}</p>
-                            </div>
+                        <>
+                          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900">{user?.name || user?.email}</p>
+                            <p className="text-xs text-gray-500">{organization?.name}</p>
                           </div>
                           <Button 
+                            variant="outline" 
+                            className="w-full justify-start"
                             onClick={() => {
                               navigate('/dashboard');
                               setIsMenuOpen(false);
                             }}
-                            variant="outline"
-                            className="w-full border-gray-300 hover:border-[#6B21E8] hover:bg-[#6B21E8]/5"
                           >
+                            <User className="h-4 w-4 mr-2" />
                             Dashboard
                           </Button>
+                          {userRole === 'admin' && (
+                            <Button 
+                              variant="outline" 
+                              className="w-full justify-start"
+                              onClick={() => {
+                                navigate('/admin');
+                                setIsMenuOpen(false);
+                              }}
+                            >
+                              <Shield className="h-4 w-4 mr-2" />
+                              Admin Panel
+                            </Button>
+                          )}
                           <Button 
+                            variant="outline" 
+                            className="w-full justify-start"
+                            onClick={() => {
+                              navigate('/profile');
+                              setIsMenuOpen(false);
+                            }}
+                          >
+                            <User className="h-4 w-4 mr-2" />
+                            Profile Settings
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-red-600 hover:text-red-700"
                             onClick={() => {
                               handleLogout();
                               setIsMenuOpen(false);
                             }}
-                            variant="destructive"
-                            className="w-full"
                           >
+                            <LogOut className="h-4 w-4 mr-2" />
                             Logout
                           </Button>
-                        </div>
+                        </>
                       ) : (
-                        <div className="space-y-3">
+                        <>
                           <Button 
-                            variant="outline"
+                            variant="outline" 
+                            className="w-full"
                             onClick={() => {
                               setShowAccessCodeModal(true);
                               setIsMenuOpen(false);
                             }}
-                            className="w-full border-gray-300 hover:border-[#6B21E8] hover:bg-[#6B21E8]/5"
                           >
                             Enter Access Code
                           </Button>
                           <Button 
+                            className="w-full bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white"
                             onClick={() => {
                               handleLogin();
                               setIsMenuOpen(false);
                             }}
-                            className="w-full bg-[#6B21E8] hover:bg-[#6B21E8]/90 text-white font-medium"
                           >
                             Sign In
                           </Button>
                           <Button 
-                            variant="outline"
+                            variant="outline" 
+                            className="w-full border-[#6B21E8] text-[#6B21E8] hover:bg-[#6B21E8] hover:text-white"
                             onClick={() => {
                               handleCreateOrg();
                               setIsMenuOpen(false);
                             }}
-                            className="w-full border-[#6B21E8] text-[#6B21E8] hover:bg-[#6B21E8] hover:text-white"
                           >
                             Create Organization
                           </Button>
-                        </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -329,48 +333,36 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Access Code Modal - Outside nav element */}
+      {/* Access Code Modal */}
       {showAccessCodeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5" />
-                <span>Enter Access Code</span>
-              </CardTitle>
+              <CardTitle>Enter Access Code</CardTitle>
               <CardDescription>
-                Enter your organization's access code to continue
+                Enter your organization's access code to join
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Access Code
-                </label>
-                <Input
-                  type="text"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="Enter your access code"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAccessCodeSubmit()}
-                />
-              </div>
-              
-              <div className="flex gap-3">
+              <Input
+                placeholder="Enter access code"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAccessCodeSubmit()}
+              />
+              <div className="flex space-x-2">
                 <Button 
-                  onClick={handleAccessCodeSubmit}
+                  variant="outline" 
                   className="flex-1"
-                >
-                  Continue
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setShowAccessCodeModal(false);
-                    setAccessCode('');
-                  }}
+                  onClick={() => setShowAccessCodeModal(false)}
                 >
                   Cancel
+                </Button>
+                <Button 
+                  className="flex-1 bg-[#6B21E8] hover:bg-[#6B21E8]/90"
+                  onClick={handleAccessCodeSubmit}
+                >
+                  Continue
                 </Button>
               </div>
             </CardContent>

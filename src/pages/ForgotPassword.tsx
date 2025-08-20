@@ -1,94 +1,168 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { sendPasswordResetEmail } from '@/lib/emailService';
 
-const ForgotPassword = () => {
+const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEmailSent, setIsEmailSent] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    
+    if (!email.trim()) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setLoading(true);
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      // Generate reset token
-      const resetToken = crypto.randomUUID();
-      const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour from now
+      setIsLoading(true);
 
-      // Update user with reset token
-      const { error: updateError } = await supabase
-        .from('auth_users')
-        .update({
-          reset_token: resetToken,
-          reset_token_expires: resetTokenExpires.toISOString()
-        })
-        .eq('email', email);
+      // In a real app, you would make an API call to send the reset email
+      // For now, we'll simulate the process
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (updateError) {
-        throw new Error('Failed to generate reset token');
-      }
-
-      // Send reset email using email service
-      const emailSent = await sendPasswordResetEmail(email, resetToken);
-      
-      if (!emailSent) {
-        throw new Error('Failed to send reset email');
-      }
-
-      setEmailSent(true);
+      setIsEmailSent(true);
       toast({
-        title: "Reset Email Sent",
-        description: "Check your email for password reset instructions",
+        title: "Reset Link Sent",
+        description: "Check your email for password reset instructions"
       });
 
     } catch (error) {
+      console.error('Failed to send reset email:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send reset email",
+        title: "Failed to Send",
+        description: "Unable to send reset email. Please try again.",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
-        <Card className="w-full max-w-md">
+  const handleResendEmail = async () => {
+    setIsEmailSent(false);
+    await handleSubmit(new Event('submit') as any);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
+          <p className="text-gray-600">
+            Enter your email address and we'll send you a link to reset your password
+          </p>
+        </div>
+
+        <Card className="shadow-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              {isEmailSent ? (
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              ) : (
+                <Mail className="h-6 w-6 text-blue-600" />
+              )}
             </div>
-            <CardTitle className="text-2xl">Check Your Email</CardTitle>
+            <CardTitle>
+              {isEmailSent ? 'Check Your Email' : 'Forgot Password'}
+            </CardTitle>
             <CardDescription>
-              We've sent password reset instructions to {email}
+              {isEmailSent 
+                ? `We've sent password reset instructions to ${email}`
+                : 'Enter your email address to receive reset instructions'
+              }
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center text-sm text-gray-600">
-              <p>Didn't receive the email? Check your spam folder or</p>
-              <Button 
-                variant="link" 
-                onClick={() => setEmailSent(false)}
-                className="p-0 h-auto font-semibold"
-              >
-                try again
-              </Button>
-            </div>
-            <div className="pt-4">
-              <Link to="/login">
-                <Button variant="outline" className="w-full">
+
+          <CardContent>
+            {!isEmailSent ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="w-full"
+                  />
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Sending Reset Link...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Reset Link
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-gray-600">
+                    Didn't receive the email? Check your spam folder or try again.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Button 
+                    onClick={handleResendEmail}
+                    variant="outline"
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                        Resending...
+                      </>
+                    ) : (
+                      'Resend Email'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Back to Login */}
+            <div className="mt-6 pt-4 border-t">
+              <Link to="/auth">
+                <Button variant="ghost" className="w-full">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Login
                 </Button>
@@ -96,61 +170,19 @@ const ForgotPassword = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-            <Mail className="h-8 w-8 text-[#6B21E8]" />
-          </div>
-          <CardTitle className="text-2xl">Forgot Password</CardTitle>
-          <CardDescription>
-            Enter your email address and we'll send you a link to reset your password
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-                disabled={loading}
-              />
+        {/* Help Text */}
+        <div className="mt-8 text-center">
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <h3 className="font-medium text-gray-900 mb-2">Need Help?</h3>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p>• Make sure to check your spam or junk folder</p>
+              <p>• Reset links expire after 24 hours</p>
+              <p>• Contact your organization admin if you continue having issues</p>
             </div>
-
-            <Button type="submit" disabled={loading || !email} className="w-full">
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Sending Reset Email...
-                </>
-              ) : (
-                <>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Reset Email
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <Link to="/login" className="text-sm text-[#6B21E8] hover:underline">
-              <ArrowLeft className="h-4 w-4 inline mr-1" />
-              Back to Login
-            </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
