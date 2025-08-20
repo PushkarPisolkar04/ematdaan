@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
@@ -20,7 +20,7 @@ if (!serviceRoleKey) {
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
 // Create candidate endpoint
-router.post('/create', async (req: Request, res: Response) => {
+router.post('/create', async (req, res) => {
   try {
     const { name, party, symbol, electionId } = req.body;
 
@@ -84,7 +84,7 @@ router.post('/create', async (req: Request, res: Response) => {
 });
 
 // Get candidates for election endpoint
-router.get('/election/:electionId', async (req: Request, res: Response) => {
+router.get('/election/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
 

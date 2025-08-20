@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
@@ -9,7 +9,7 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
 // Register user with invitation
-router.post('/register-with-invitation', async (req: Request, res: Response) => {
+router.post('/register-with-invitation', async (req, res) => {
   try {
     const { token, name, email, password } = req.body;
 
