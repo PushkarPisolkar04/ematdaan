@@ -95,6 +95,14 @@ export default function Navbar() {
     { label: "FAQs", href: "#faqs", onClick: handleFAQClick },
   ];
 
+  // Add navigation items for authenticated users (non-admin)
+  const authenticatedNavItems = [
+    { label: "Home", href: "/", onClick: handleHomeClick },
+    { label: "Elections", href: "/elections", onClick: () => setIsMenuOpen(false) },
+    { label: "Verify Vote", href: "/verify-vote", onClick: () => setIsMenuOpen(false) },
+    { label: "FAQs", href: "#faqs", onClick: handleFAQClick },
+  ];
+
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm z-40">
@@ -115,7 +123,7 @@ export default function Navbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-1">
-              {navItems.map((item) => (
+              {(isAuthenticated && userRole !== 'admin' ? authenticatedNavItems : navItems).map((item) => (
                 <Link 
                   key={item.label}
                   to={item.href}
@@ -203,7 +211,7 @@ export default function Navbar() {
 
                     {/* Mobile Navigation */}
                     <nav className="flex-1 space-y-2">
-                      {navItems.map((item) => (
+                      {(isAuthenticated && userRole !== 'admin' ? authenticatedNavItems : navItems).map((item) => (
                         <Link 
                           key={item.label}
                           to={item.href}

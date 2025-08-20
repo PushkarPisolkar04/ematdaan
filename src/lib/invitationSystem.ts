@@ -54,7 +54,7 @@ export const uploadStudentCSV = async (file: File, organizationId: string): Prom
           organization_id: organizationId,
           email: email.toLowerCase(),
           invitation_token: invitationToken,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
         });
       }
     }
@@ -111,7 +111,7 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
         <li>This invitation link can only be used once</li>
         <li>The link will work until you complete registration</li>
         <li>If you close the page without registering, you can use the link again</li>
-        <li>Link expires in 30 days</li>
+        <li>Link expires in 7 days</li>
       </ul>
       <p>If the button doesn't work, copy and paste this link:</p>
       <p style="word-break: break-all; color: #6B21E8;">${invitationLink}</p>

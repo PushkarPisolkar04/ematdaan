@@ -324,7 +324,21 @@ CREATE TABLE access_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 15. AUDIT_LOGS (Security tracking)
+-- 15. STUDENT_INVITATIONS (Student invitation system)
+CREATE TABLE student_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    invitation_token TEXT UNIQUE NOT NULL,
+    is_used BOOLEAN DEFAULT false,
+    used_by UUID REFERENCES auth_users(id),
+    used_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 16. AUDIT_LOGS (Security tracking)
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -369,6 +383,12 @@ CREATE INDEX idx_otps_email ON otps(email);
 CREATE INDEX idx_otps_otp ON otps(otp);
 CREATE INDEX idx_audit_logs_org ON audit_logs(organization_id);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+
+-- Student invitations indexes
+CREATE INDEX idx_student_invitations_org ON student_invitations(organization_id);
+CREATE INDEX idx_student_invitations_token ON student_invitations(invitation_token);
+CREATE INDEX idx_student_invitations_email ON student_invitations(email);
+CREATE INDEX idx_student_invitations_expires ON student_invitations(expires_at);
 
 -- =====================================================
 -- STEP 4: CREATE FUNCTIONS
@@ -534,6 +554,16 @@ BEGIN
         SELECT 1 FROM votes 
         WHERE user_id = p_user_id AND election_id = p_election_id
     );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Mark invitation as used function
+CREATE OR REPLACE FUNCTION mark_invitation_used(p_invitation_id UUID, p_user_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE student_invitations 
+    SET is_used = true, used_by = p_user_id, used_at = NOW(), updated_at = NOW() 
+    WHERE id = p_invitation_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -1111,6 +1141,35 @@ CREATE POLICY "access_tokens_admin_manage" ON access_tokens
         AND role = 'admin'
     ));
 
+-- STUDENT_INVITATIONS
+-- Enable RLS
+ALTER TABLE student_invitations ENABLE ROW LEVEL SECURITY;
+
+-- Service role policies (for backend operations)
+CREATE POLICY "student_invitations_service_manage" ON student_invitations
+    FOR ALL USING (auth.role() = 'service_role');
+
+-- Organization admin policies
+CREATE POLICY "student_invitations_admin_manage" ON student_invitations
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM user_organizations uo 
+            WHERE uo.user_id = auth.uid() 
+            AND uo.organization_id = student_invitations.organization_id 
+            AND uo.role = 'admin'
+        )
+    );
+
+-- Read policy for organization members
+CREATE POLICY "student_invitations_read_org" ON student_invitations
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM user_organizations uo 
+            WHERE uo.user_id = auth.uid() 
+            AND uo.organization_id = student_invitations.organization_id
+        )
+    );
+
 -- AUDIT_LOGS
 -- Allow service role to manage audit logs
 CREATE POLICY "audit_logs_service_manage" ON audit_logs
@@ -1149,6 +1208,10 @@ CREATE TRIGGER update_auth_users_updated_at
     BEFORE UPDATE ON auth_users 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_student_invitations_updated_at 
+    BEFORE UPDATE ON student_invitations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 
 -- =====================================================
 -- MIGRATION COMPLETE
@@ -1158,5 +1221,5 @@ CREATE TRIGGER update_auth_users_updated_at
 INSERT INTO audit_logs (action, details) 
 VALUES (
     'migration_completed',
-    '{"migration": "complete_system_reset", "tables_created": 15, "functions_created": 15, "policies_created": 55}'
+    '{"migration": "complete_system_reset", "tables_created": 16, "functions_created": 15, "policies_created": 59}'
 ); 

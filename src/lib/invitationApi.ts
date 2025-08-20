@@ -80,7 +80,9 @@ export const invitationApi = {
 
   async validateInvitationToken(token: string): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/invitations/validate/${token}`);
+      const encodedToken = encodeURIComponent(token);
+      const url = `${API_BASE_URL}/api/invitations/validate/${encodedToken}`;
+      const response = await fetch(url);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -89,7 +91,6 @@ export const invitationApi = {
 
       return await response.json();
     } catch (error) {
-      console.error('Error validating invitation token:', error);
       throw error;
     }
   }

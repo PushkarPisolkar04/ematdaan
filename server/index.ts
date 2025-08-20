@@ -3,10 +3,12 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import organizationsRouter from './api/organizations.js';
-import electionsRouter from './api/elections.js';
-import candidatesRouter from './api/candidates.js';
-import invitationsRouter from './api/invitations.js';
+import organizationsRouter from './api/organizations';
+import electionsRouter from './api/elections';
+import candidatesRouter from './api/candidates';
+import invitationsRouter from './api/invitations';
+import authRouter from './api/auth';
+import statsRouter from './api/stats';
 
 // Load environment variables from the project root
 dotenv.config({ path: '.env' });
@@ -197,6 +199,12 @@ app.use('/api/candidates', candidatesRouter);
 
 // Invitations routes
 app.use('/api/invitations', invitationsRouter);
+
+// Auth routes
+app.use('/api/auth', authRouter);
+
+// Stats routes
+app.use('/api/stats', statsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

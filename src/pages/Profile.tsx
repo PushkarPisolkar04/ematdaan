@@ -151,7 +151,7 @@ Generated on: ${new Date().toLocaleString()}
             <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
             <p className="text-gray-600">{user.email}</p>
             <div className="flex items-center space-x-2 mt-1">
-              <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className={userRole === 'admin' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-500 hover:bg-gray-600'}>
+              <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className={userRole === 'admin' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}>
                 {userRole === 'admin' ? 'Administrator' : 'Student'}
               </Badge>
               <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">{organization.name}</Badge>

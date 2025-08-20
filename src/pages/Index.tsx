@@ -245,7 +245,7 @@ const Index = () => {
                             <span className="font-medium">Active Elections</span>
                           </div>
                           <span className={`text-2xl font-bold text-orange-600 ${statsLoading ? 'animate-pulse' : ''}`}>
-                            {statsLoading ? '...' : activeElections.length}
+                            {statsLoading ? '...' : (platformStats?.activeElections || 0)}
                           </span>
                         </div>
                       </div>

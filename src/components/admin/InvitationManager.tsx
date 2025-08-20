@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Users, Mail, CheckCircle, Clock, XCircle, Download, Plus, ArrowLeft } from 'lucide-react';
+import { Upload, Users, Mail, CheckCircle, Clock, XCircle, Download, Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { invitationApi } from '@/lib/invitationApi';
 import { toast } from '@/hooks/use-toast';
@@ -53,6 +53,7 @@ const InvitationManager: React.FC = () => {
   });
   const [invitations, setInvitations] = useState<StudentInvitation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingInvitation, setDeletingInvitation] = useState<string | null>(null);
 
   useEffect(() => {
     if (organization?.id) {
@@ -118,22 +119,14 @@ const InvitationManager: React.FC = () => {
         throw new Error('No organization ID found');
       }
       
-      // Parse CSV file to extract emails
+      // Parse CSV file to extract emails (each line is an email address)
       const csvText = await selectedFile.text();
       const lines = csvText.split('\n').filter(line => line.trim());
-      const headers = lines[0].split(',').map(h => h.trim());
       
-      // Find email column
-      const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));
-      if (emailIndex === -1) {
-        throw new Error('No email column found in CSV');
-      }
-      
-      // Extract emails
+      // Extract emails (treat each line as an email address)
       const emails = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        const email = values[emailIndex];
+      for (const line of lines) {
+        const email = line.trim();
         if (email && isValidEmail(email)) {
           emails.push(email.toLowerCase());
         }
@@ -242,9 +235,44 @@ const InvitationManager: React.FC = () => {
     }
   };
 
+  const handleDeleteInvitation = async (invitationId: string) => {
+    try {
+      setDeletingInvitation(invitationId);
+      
+      // Use the server endpoint to delete invitation (bypasses RLS)
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/invitations/delete/${invitationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete invitation');
+      }
+      
+      toast({
+        title: "Invitation Deleted",
+        description: "Invitation has been successfully deleted",
+      });
+      
+      // Reload data
+      await loadInvitationData();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete invitation",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingInvitation(null);
+    }
+  };
+
   const downloadSampleCSV = () => {
-    const csvContent = `email
-student1@college.edu
+    const csvContent = `student1@college.edu
 student2@college.edu
 student3@college.edu`;
     
@@ -392,7 +420,7 @@ student3@college.edu`;
                   className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
                 />
                 <p className="text-sm text-muted-foreground">
-                  CSV should contain an "email" column with student email addresses. Only email addresses are required.
+                  CSV should contain one email address per line. No headers required.
                 </p>
               </div>
 
@@ -504,6 +532,7 @@ student3@college.edu`;
                     <TableHead>Sent Date</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Used Date</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -526,6 +555,21 @@ student3@college.edu`;
                           ? new Date(invitation.used_at).toLocaleDateString()
                           : '-'
                         }
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteInvitation(invitation.id)}
+                          disabled={deletingInvitation === invitation.id}
+                          className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400"
+                        >
+                          {deletingInvitation === invitation.id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

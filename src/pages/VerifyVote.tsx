@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -71,6 +73,8 @@ const VerifyVote: React.FC = () => {
     }
     if (receipt) {
       loadVoteRecord();
+    } else {
+      setLoading(false);
     }
   }, [isAuthenticated, receipt, user, organization]);
 
@@ -310,6 +314,59 @@ Generated on: ${new Date().toLocaleString()}
           <Button onClick={() => navigate('/dashboard')}>
             Return to Dashboard
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If no receipt is provided, show form to enter receipt
+  if (!receipt) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <Shield className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-2">Vote Verification</h1>
+            <p className="text-gray-600">
+              Enter your vote receipt ID to verify your vote
+            </p>
+          </div>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const receiptId = formData.get('receipt') as string;
+                if (receiptId) {
+                  navigate(`/verify-vote/${receiptId}`);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="receipt">Receipt ID</Label>
+                    <Input
+                      id="receipt"
+                      name="receipt"
+                      type="text"
+                      placeholder="Enter your vote receipt ID"
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Verify Vote
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          
+          <div className="text-center mt-4">
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Return to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );

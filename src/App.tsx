@@ -60,6 +60,12 @@ function App() {
               </ProtectedRoute>
             } />
             
+            <Route path="/verify-vote" element={
+              <ProtectedRoute>
+                <VerifyVote />
+              </ProtectedRoute>
+            } />
+            
             <Route path="/vote-receipt/:receiptId" element={
               <ProtectedRoute>
                 <VoteReceipt />

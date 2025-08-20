@@ -49,7 +49,7 @@ router.post('/create-from-csv', async (req, res) => {
           organization_id: organizationId,
           email: email.toLowerCase(),
           invitation_token: invitationToken,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
         });
       }
     }
@@ -122,14 +122,11 @@ router.get('/validate/:token', async (req, res) => {
     }
 
     // Direct query to student_invitations table
-    console.log('Validating token:', token);
     const { data, error } = await supabase
       .from('student_invitations')
       .select('*')
       .eq('invitation_token', token)
       .single();
-    
-    console.log('Query result:', { data, error });
 
     if (error || !data) {
       return res.json({
@@ -266,7 +263,7 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
         <li>This invitation link can only be used once</li>
         <li>The link will work until you complete registration</li>
         <li>If you close the page without registering, you can use the link again</li>
-        <li>Link expires in 30 days</li>
+        <li>Link expires in 7 days</li>
       </ul>
       <p>If the button doesn't work, copy and paste this link:</p>
       <p style="word-break: break-all; color: #6B21E8;">${invitationLink}</p>
@@ -304,5 +301,45 @@ const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
+
+// Delete invitation (must be before /organization/:organizationId to avoid conflicts)
+router.delete('/delete/:invitationId', async (req, res) => {
+  try {
+    const { invitationId } = req.params;
+
+    if (!invitationId) {
+      return res.status(400).json({ error: 'Invitation ID is required' });
+    }
+
+    // Delete the invitation using service role (bypasses RLS)
+    const { data, error } = await supabase
+      .from('student_invitations')
+      .delete()
+      .eq('id', invitationId)
+      .select();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete invitation' });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Invitation deleted successfully',
+      deletedInvitation: data[0]
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test route
+router.get('/test-delete', (req, res) => {
+  res.json({ message: 'Delete route is working' });
+});
 
 export default router; 

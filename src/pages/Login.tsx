@@ -67,13 +67,9 @@ const Login = () => {
       return;
     }
 
-    console.log('Validating invitation token:', token);
-    console.log('Token length:', token.length);
-
     try {
       setValidatingInvitation(true);
       const validation = await invitationApi.validateInvitationToken(token);
-      console.log('Validation result:', validation);
       setInvitationValidation(validation);
       
       if (validation.is_valid) {
@@ -81,7 +77,6 @@ const Login = () => {
         setJoinData(prev => ({ ...prev, email: validation.email }));
       }
     } catch (error) {
-      console.error('Error validating invitation:', error);
       setInvitationValidation({
         is_valid: false,
         reason: 'Failed to validate invitation'
@@ -272,7 +267,11 @@ const Login = () => {
           setActiveTab('login');
       setLoginData({ email: joinData.email, password: '' });
     } catch (error) {
-      console.error('Join organization failed:', error);
+      toast({
+        title: "Join Failed",
+        description: error instanceof Error ? error.message : 'Failed to join organization',
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

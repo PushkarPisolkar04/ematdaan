@@ -185,14 +185,12 @@ const Admin = () => {
       const activeElections = currentElections.filter(e => e.is_active).length;
       const totalVotes = currentElections.reduce((sum, e) => sum + (e.total_votes || 0), 0);
 
-      // Get pending invitations count
-      const { data: accessTokens } = await supabase
-        .from('access_tokens')
-        .select('id, used_count, usage_limit')
-        .eq('organization_id', organization?.id)
-        .eq('is_active', true);
+      // Get pending invitations count using the database function
+      const { data: invitationStats } = await supabase.rpc('get_invitation_stats', {
+        p_organization_id: organization?.id
+      });
       
-      const pendingInvitations = accessTokens?.filter(token => token.used_count < token.usage_limit).length || 0;
+      const pendingInvitations = invitationStats?.[0]?.pending_invitations || 0;
 
       setStats({
         totalUsers,

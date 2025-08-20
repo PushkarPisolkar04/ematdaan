@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { invitationApi } from '@/lib/invitationApi';
+import { authApi } from '@/lib/authApi';
 import { useToast } from '@/hooks/use-toast';
 import { generateSecureOTP, isValidOTPFormat } from '@/lib/secureUtils';
 
@@ -442,73 +444,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Validate invitation token
-      const { data: tokenData, error: tokenError } = await supabase.rpc('validate_invitation_token', {
-        p_token: token
+      // Use backend API for registration
+      const result = await authApi.registerWithInvitation({
+        token,
+        name: data.name,
+        email: data.email,
+        password: data.password
       });
-
-      if (tokenError || !tokenData || tokenData.length === 0 || !tokenData[0].is_valid) {
-        throw new Error('Invalid or expired invitation token');
-      }
-
-      const tokenInfo = tokenData[0];
-
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', data.email)
-        .single();
-
-      if (existingUser) {
-        throw new Error('User already exists with this email');
-      }
-
-      // Hash user password
-      const encoder = new TextEncoder();
-      const userPasswordData = encoder.encode(data.password);
-      const userPasswordHashBuffer = await crypto.subtle.digest('SHA-256', userPasswordData);
-      const userPasswordHashArray = Array.from(new Uint8Array(userPasswordHashBuffer));
-      const userPasswordHash = userPasswordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      // Create user
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .insert({
-          email: data.email,
-          password_hash: userPasswordHash,
-          name: data.name,
-          role: tokenInfo.role,
-          is_verified: false
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        throw new Error('Failed to create user');
-      }
-
-      // Create user-organization relationship
-      const { error: userOrgError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: userData.id,
-          organization_id: tokenInfo.organization_id,
-          role: tokenInfo.role,
-          joined_via: 'invitation',
-          access_token_id: tokenInfo.token_id,
-          is_active: true
-        });
-
-      if (userOrgError) {
-        throw new Error('Failed to associate user with organization');
-      }
-
-      // Update token usage count
-      await supabase
-        .from('access_tokens')
-        .update({ used_count: tokenInfo.used_count + 1 })
-        .eq('id', tokenInfo.token_id);
 
       toast({
         title: "Joined Organization",
@@ -516,7 +458,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
     } catch (error) {
-      console.error('Join organization failed:', error);
       toast({
         title: "Join Failed",
         description: error instanceof Error ? error.message : 'An error occurred while joining the organization',
