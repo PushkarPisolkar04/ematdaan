@@ -77,7 +77,7 @@ const Admin = () => {
         description: "You need admin privileges to access this page",
         variant: "destructive"
       });
-      navigate('/dashboard');
+      navigate('/admin');
       return;
     }
 
@@ -434,10 +434,7 @@ const Admin = () => {
                 {organization?.name} • Manage elections, users, and settings
               </p>
             </div>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
+            
           </div>
         </div>
 

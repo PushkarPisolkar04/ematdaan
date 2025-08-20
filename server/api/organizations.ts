@@ -191,19 +191,13 @@ router.post('/send-otp', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Store OTP in database with organization details
+    // Store OTP in database
     const { error: otpError } = await supabase
       .from('otps')
       .insert({
         email: email,
         otp: otp,
-        expires_at: expiresAt.toISOString(),
-        details: JSON.stringify({
-          name,
-          ownerName,
-          ownerEmail: email,
-          ownerPassword
-        })
+        expires_at: expiresAt.toISOString()
       });
 
     if (otpError) {
@@ -290,19 +284,23 @@ router.post('/verify-otp', async (req, res) => {
       .update({ is_verified: true })
       .eq('id', otpData.id);
 
-    // Get organization data from OTP details
-    console.log('OTP Data:', otpData);
-    console.log('OTP Details:', otpData.details);
+    // For now, we'll need to get the organization data from the request body
+    // This is a temporary fix until we add the details column to the database
+    const { name, ownerName, ownerPassword } = req.body;
     
-    const orgDetails = otpData.details ? JSON.parse(otpData.details) : null;
-    console.log('Parsed Org Details:', orgDetails);
-    
-    if (!orgDetails) {
+    if (!name || !ownerName || !ownerPassword) {
       return res.status(400).json({
         success: false,
-        message: 'No organization data found'
+        message: 'Organization data is required'
       });
     }
+    
+    const orgDetails = {
+      name,
+      ownerName,
+      ownerEmail: email,
+      ownerPassword
+    };
 
     // Generate slug
     const slug = orgDetails.name

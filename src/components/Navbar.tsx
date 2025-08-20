@@ -91,8 +91,6 @@ export default function Navbar() {
 
   const navItems = [
     { label: "Home", href: "/", onClick: handleHomeClick },
-    { label: "Vote", href: "/auth" },
-    { label: "Elections", href: "/elections" },
     { label: "FAQs", href: "#faqs", onClick: handleFAQClick },
   ];
 
@@ -132,14 +130,15 @@ export default function Navbar() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56" title="User Menu">
-                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                      <User className="h-4 w-4 mr-2" />
-                      Dashboard
-                    </DropdownMenuItem>
-                    {userRole === 'admin' && (
+                    {userRole === 'admin' ? (
                       <DropdownMenuItem onClick={() => navigate('/admin')}>
                         <Shield className="h-4 w-4 mr-2" />
                         Admin Panel
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                        <User className="h-4 w-4 mr-2" />
+                        Dashboard
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
@@ -214,18 +213,7 @@ export default function Navbar() {
                             <p className="text-sm font-medium text-gray-900">{user?.name || user?.email}</p>
                             <p className="text-xs text-gray-500">{organization?.name}</p>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start"
-                            onClick={() => {
-                              navigate('/dashboard');
-                              setIsMenuOpen(false);
-                            }}
-                          >
-                            <User className="h-4 w-4 mr-2" />
-                            Dashboard
-                          </Button>
-                          {userRole === 'admin' && (
+                          {userRole === 'admin' ? (
                             <Button 
                               variant="outline" 
                               className="w-full justify-start"
@@ -237,7 +225,20 @@ export default function Navbar() {
                               <Shield className="h-4 w-4 mr-2" />
                               Admin Panel
                             </Button>
+                          ) : (
+                            <Button 
+                              variant="outline" 
+                              className="w-full justify-start"
+                              onClick={() => {
+                                navigate('/dashboard');
+                                setIsMenuOpen(false);
+                              }}
+                            >
+                              <User className="h-4 w-4 mr-2" />
+                              Dashboard
+                            </Button>
                           )}
+
                           <Button 
                             variant="outline" 
                             className="w-full justify-start"

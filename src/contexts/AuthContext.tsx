@@ -36,6 +36,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => Promise<void>;
   createOrganization: (data: {
     name: string;
     ownerName: string;
@@ -107,6 +108,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const sessionData = data[0];
+      
+      // Set user context for RLS policies
+      await supabase.rpc('set_user_context', {
+        p_user_id: sessionData.user_id
+      });
+
+      // Set organization context for RLS policies
+      await supabase.rpc('set_organization_context', {
+        p_organization_id: sessionData.organization_id
+      });
       
       // Get user details
       const { data: userData, error: userError } = await supabase
@@ -206,6 +217,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Failed to create session');
       }
 
+      // Set user context for RLS policies
+      await supabase.rpc('set_user_context', {
+        p_user_id: userData.id
+      });
+
+      // Set organization context for RLS policies
+      await supabase.rpc('set_organization_context', {
+        p_organization_id: userOrgData.organization_id
+      });
+
       // Store session token
       localStorage.setItem('session_token', sessionData);
 
@@ -293,7 +314,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
 
       // Send OTP via backend API
-      const response = await fetch('http://localhost:5000/api/organizations/send-otp', {
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      const response = await fetch(`${serverUrl}/api/organizations/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,6 +332,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to send OTP');
       }
+
+      // Store organization data temporarily for OTP verification
+      localStorage.setItem('pending_org_data', JSON.stringify({
+        name: data.name,
+        ownerName: data.ownerName,
+        ownerPassword: data.ownerPassword
+      }));
 
       toast({
         title: "OTP Sent",
@@ -336,15 +365,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
+      // Get the pending organization data from localStorage
+      const pendingOrgData = localStorage.getItem('pending_org_data');
+      if (!pendingOrgData) {
+        throw new Error('No pending organization data found');
+      }
+      
+      const orgData = JSON.parse(pendingOrgData);
+
       // Verify OTP and create organization via backend API
-      const response = await fetch('http://localhost:5000/api/organizations/verify-otp', {
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      const response = await fetch(`${serverUrl}/api/organizations/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email: email,
-          otp: otp
+          otp: otp,
+          name: orgData.name,
+          ownerName: orgData.ownerName,
+          ownerPassword: orgData.ownerPassword
         })
       });
 
@@ -369,6 +410,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('user_data', JSON.stringify(result.data.user));
         localStorage.setItem('organization_data', JSON.stringify(result.data.organization));
         localStorage.setItem('user_role', 'admin');
+        
+        // Clean up pending organization data
+        localStorage.removeItem('pending_org_data');
 
         toast({
           title: "Organization Created",
@@ -497,7 +541,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const otp = generateSecureOTP();
       
       // Send OTP via email using server endpoint
-      const response = await fetch('http://localhost:5000/api/send-otp', {
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+      const response = await fetch(`${serverUrl}/api/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -522,6 +567,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({
         title: "OTP Failed",
         description: "Failed to send verification code. Please try again.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const updateUser = async (userData: Partial<User>): Promise<void> => {
+    if (!user) return;
+
+    try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_user_context', {
+        p_user_id: user.id
+      });
+
+      // Update the user in the database
+      const { error } = await supabase
+        .from('auth_users')
+        .update(userData)
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the local state
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+
+      // Update localStorage
+      localStorage.setItem('user_data', JSON.stringify(updatedUser));
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully"
+      });
+
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update profile. Please try again.",
         variant: "destructive"
       });
       throw error;
@@ -603,6 +690,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     login,
     logout,
+    updateUser,
     createOrganization,
     verifyOrganizationOTP,
     joinOrganization,

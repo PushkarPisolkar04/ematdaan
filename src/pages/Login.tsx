@@ -276,7 +276,7 @@ const Login = () => {
                     </Button>
                     </form>
                     <div className="text-center pt-1">
-                      <Link to="/forgot-password" className="text-sm text-[#6B21E8] hover:text-[#6B21E8]/80 hover:underline font-medium">
+                      <Link to="/reset-password" className="text-sm text-[#6B21E8] hover:text-[#6B21E8]/80 hover:underline font-medium">
                         Forgot your password?
                       </Link>
                     </div>

@@ -17,8 +17,6 @@ import {
   History, 
   Save, 
   X,
-  Eye,
-  EyeOff,
   Trash2,
   Download
 } from 'lucide-react';
@@ -40,28 +38,18 @@ interface VoteHistory {
 }
 
 const Profile: React.FC = () => {
-  const { user, organization, userRole, isAuthenticated, logout } = useAuth();
+  const { user, organization, userRole, isAuthenticated, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [voteHistory, setVoteHistory] = useState<VoteHistory[]>([]);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Form states
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phone: ''
-  });
-
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
   });
 
   useEffect(() => {
@@ -78,6 +66,8 @@ const Profile: React.FC = () => {
       loadVoteHistory();
     }
   }, [isAuthenticated, user]);
+
+
 
   const loadVoteHistory = async () => {
     if (!user) return;
@@ -132,103 +122,20 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
-        .from('auth_users')
-        .update({
-          name: profileData.name
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully"
+      // Use the updateUser function from AuthContext
+      await updateUser({
+        name: profileData.name
       });
-
-      // Update the auth context (simplified - in a real app you'd refresh the session)
-      // For now, we'll just show the success message
 
     } catch (error) {
       console.error('Failed to update profile:', error);
-      toast({
-        title: "Update Failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive"
-      });
+      // Error handling is already done in the updateUser function
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChangePassword = async () => {
-    if (!user) return;
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "New password and confirm password do not match",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Hash the new password
-      const encoder = new TextEncoder();
-      const newPasswordData = encoder.encode(passwordData.newPassword);
-      const passwordHashBuffer = await crypto.subtle.digest('SHA-256', newPasswordData);
-      const passwordHashArray = Array.from(new Uint8Array(passwordHashBuffer));
-      const passwordHash = passwordHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      // Update the password hash
-      const { error } = await supabase
-        .from('auth_users')
-        .update({
-          password_hash: passwordHash
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Password Changed",
-        description: "Your password has been changed successfully"
-      });
-
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setShowChangePassword(false);
-
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      toast({
-        title: "Password Change Failed",
-        description: "Failed to change password. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDownloadReceipt = (vote: VoteHistory) => {
     const receiptData = `
@@ -290,8 +197,8 @@ Generated on: ${new Date().toLocaleString()}
   };
 
   if (!user || !organization) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+      return (
+    <div className="min-h-screen bg-gray-50 pt-20">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Profile Not Available</h1>
           <Button onClick={() => navigate('/dashboard')}>
@@ -303,7 +210,8 @@ Generated on: ${new Date().toLocaleString()}
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gray-50 pt-20">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center space-x-4 mb-4">
@@ -324,10 +232,10 @@ Generated on: ${new Date().toLocaleString()}
       </div>
 
       <Tabs defaultValue="personal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className={`grid w-full ${userRole === 'admin' ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="history">Vote History</TabsTrigger>
+          {userRole !== 'admin' && <TabsTrigger value="history">Vote History</TabsTrigger>}
         </TabsList>
 
         {/* Personal Information Tab */}
@@ -390,11 +298,9 @@ Generated on: ${new Date().toLocaleString()}
                 </div>
               </div>
 
-              <div className="flex space-x-4 pt-4">
-                <Button onClick={handleSaveProfile} disabled={loading}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
+              <Separator />
+
+              <div className="flex justify-end space-x-4">
                 <Button 
                   variant="outline" 
                   onClick={() => setProfileData({
@@ -405,6 +311,14 @@ Generated on: ${new Date().toLocaleString()}
                 >
                   <X className="h-4 w-4 mr-2" />
                   Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveProfile}
+                  disabled={loading}
+                  className="bg-[#6B21E8] hover:bg-[#6B21E8]/90"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
                 </Button>
               </div>
             </CardContent>
@@ -433,101 +347,14 @@ Generated on: ${new Date().toLocaleString()}
                   </div>
                   <Button 
                     variant="outline" 
-                    onClick={() => setShowChangePassword(!showChangePassword)}
+                    onClick={() => navigate('/reset-password')}
                   >
                     <Key className="h-4 w-4 mr-2" />
-                    Change Password
+                    Reset Password
                   </Button>
                 </div>
 
-                {showChangePassword && (
-                  <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Current Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="currentPassword"
-                          type={showCurrentPassword ? "text" : "password"}
-                          value={passwordData.currentPassword}
-                          onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                          placeholder="Enter current password"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                        >
-                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="newPassword"
-                          type={showNewPassword ? "text" : "password"}
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                          placeholder="Enter new password"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                        >
-                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          placeholder="Confirm new password"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2">
-                      <Button onClick={handleChangePassword} disabled={loading}>
-                        Update Password
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setShowChangePassword(false);
-                          setPasswordData({
-                            currentPassword: '',
-                            newPassword: '',
-                            confirmPassword: ''
-                          });
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <Separator />
@@ -566,8 +393,9 @@ Generated on: ${new Date().toLocaleString()}
           </Card>
         </TabsContent>
 
-        {/* Vote History Tab */}
-        <TabsContent value="history" className="space-y-6">
+        {/* Vote History Tab - Only for non-admin users */}
+        {userRole !== 'admin' && (
+          <TabsContent value="history" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -635,7 +463,9 @@ Generated on: ${new Date().toLocaleString()}
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
+      </div>
     </div>
   );
 };
