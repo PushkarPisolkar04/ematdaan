@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { electionApi } from '@/lib/electionApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { generateElectionResultsReport } from '@/lib/receipt';
-import { Loader2, Trophy, Download, Share2, Users, Vote, TrendingUp } from 'lucide-react';
+import { Loader2, Trophy, Download, Share2, Users, Vote, TrendingUp, AlertCircle } from 'lucide-react';
 
 interface Candidate {
   id: string;
@@ -23,7 +24,7 @@ interface Candidate {
 interface Election {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   start_time: string;
   end_time: string;
   is_active: boolean;
@@ -64,15 +65,15 @@ const Results: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get election details
-      const { data: election, error: electionError } = await supabase
-        .from('elections')
-        .select('*')
-        .eq('id', electionId)
-        .eq('organization_id', organization.id)
-        .single();
+      // Get election details using the API
+      const election = await electionApi.getElection(electionId);
 
-      if (electionError) {
+      if (!election) {
+        throw new Error('Election not found');
+      }
+
+      // Verify the election belongs to the user's organization
+      if (election.organization_id !== organization.id) {
         throw new Error('Election not found');
       }
 
@@ -83,14 +84,29 @@ const Results: React.FC = () => {
           id,
           name,
           party,
-          symbol,
-          votes:votes(count)
+          symbol
         `)
         .eq('election_id', electionId);
 
       if (candidatesError) {
         throw candidatesError;
       }
+
+      // Get vote counts for each candidate
+      const candidatesWithVotes = await Promise.all(
+        (candidates || []).map(async (candidate) => {
+          const { count: voteCount } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('election_id', electionId)
+            .eq('candidate_id', candidate.id);
+
+          return {
+            ...candidate,
+            vote_count: voteCount || 0
+          };
+        })
+      );
 
       // Get total votes
       const { count: totalVotes, error: voteCountError } = await supabase
@@ -114,19 +130,18 @@ const Results: React.FC = () => {
       }
 
       // Process candidates data
-      const processedCandidates: Candidate[] = candidates?.map(candidate => {
-        const voteCount = candidate.votes?.[0]?.count || 0;
-        const percentage = totalVotes ? (voteCount / totalVotes) * 100 : 0;
+      const processedCandidates: Candidate[] = candidatesWithVotes.map(candidate => {
+        const percentage = totalVotes ? (candidate.vote_count / totalVotes) * 100 : 0;
         
         return {
           id: candidate.id,
           name: candidate.name,
           party: candidate.party,
           symbol: candidate.symbol,
-          vote_count: voteCount,
+          vote_count: candidate.vote_count,
           percentage: Math.round(percentage * 100) / 100
         };
-      }).sort((a, b) => b.vote_count - a.vote_count) || [];
+      }).sort((a, b) => b.vote_count - a.vote_count);
 
       const participationRate = totalEligibleVoters ? (totalVotes / totalEligibleVoters) * 100 : 0;
 
@@ -239,10 +254,10 @@ const Results: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading results...</p>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-gray-600">Loading results...</p>
         </div>
       </div>
     );
@@ -250,10 +265,10 @@ const Results: React.FC = () => {
 
   if (!results) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Results Not Found</h1>
-          <Button onClick={() => navigate('/dashboard')}>
+          <h1 className="text-2xl font-bold mb-4 text-gray-900">Results Not Found</h1>
+          <Button onClick={() => navigate('/dashboard')} className="bg-purple-600 hover:bg-purple-700">
             Return to Dashboard
           </Button>
         </div>
@@ -261,161 +276,277 @@ const Results: React.FC = () => {
     );
   }
 
+  const getElectionStatus = (election: Election) => {
+    const now = new Date();
+    const startTime = new Date(election.start_time);
+    const endTime = new Date(election.end_time);
+
+    if (now < startTime) {
+      return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-600 text-white' };
+    } else if (now > endTime) {
+      return { status: 'completed', label: 'Completed', color: 'bg-gray-600 text-white' };
+    } else if (election.is_active) {
+      return { status: 'active', label: 'Active', color: 'bg-purple-600 text-white' };
+    } else {
+      return { status: 'inactive', label: 'Inactive', color: 'bg-red-600 text-white' };
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
+    });
+  };
+
+  const electionStatus = getElectionStatus(results.election);
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{results.election.name}</h1>
-            <p className="text-gray-600 mt-1">{results.election.description}</p>
-          </div>
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            Results Finalized
-          </Badge>
-        </div>
-
-        <div className="flex items-center space-x-6 text-sm text-gray-600">
-          <div className="flex items-center space-x-2">
-            <Vote className="h-4 w-4" />
-            <span>{results.totalVotes} votes cast</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Users className="h-4 w-4" />
-            <span>{results.totalEligibleVoters} eligible voters</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="h-4 w-4" />
-            <span>{results.participationRate}% participation</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Winner Announcement */}
-      {winner && (
-        <Card className="mb-8 border-2 border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center space-x-4">
-              <Trophy className="h-12 w-12 text-yellow-600" />
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900">{winner.name}</h2>
-                <p className="text-lg text-gray-600">
-                  {winner.vote_count} votes ({winner.percentage}%)
-                </p>
-                <Badge className="mt-2 bg-yellow-600 text-white">
-                  🏆 Winner
-                </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{results.election.name}</h1>
+              <p className="text-gray-600 mt-1">
+                {results.election.description || 'Election Results'}
+              </p>
+              <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                <span>Start: {formatDateTime(results.election.start_time)}</span>
+                <span>End: {formatDateTime(results.election.end_time)}</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <Badge className={`${electionStatus.color} text-lg px-4 py-2`}>
+              {electionStatus.label}
+            </Badge>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Results List */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Election Results</CardTitle>
-              <CardDescription>
-                All candidates ranked by vote count
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {results.candidates.map((candidate, index) => (
-                <div key={candidate.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-medium">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">{candidate.name}</h3>
-                        {candidate.party && (
-                          <p className="text-sm text-gray-500">{candidate.party}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{candidate.vote_count} votes</p>
-                      <p className="text-sm text-gray-500">{candidate.percentage}%</p>
-                    </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Total Votes</p>
+                    <p className="text-2xl font-bold text-purple-900">{results.totalVotes}</p>
                   </div>
-                  <Progress value={candidate.percentage} className="h-2" />
-                  {index < results.candidates.length - 1 && <Separator />}
+                  <Vote className="h-6 w-6 text-purple-600" />
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Eligible Voters</p>
+                    <p className="text-2xl font-bold text-green-900">{results.totalEligibleVoters}</p>
+                  </div>
+                  <Users className="h-6 w-6 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Participation</p>
+                    <p className="text-2xl font-bold text-blue-900">{results.participationRate}%</p>
+                  </div>
+                  <TrendingUp className="h-6 w-6 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Candidates</p>
+                    <p className="text-2xl font-bold text-orange-900">{results.candidates.length}</p>
+                  </div>
+                  <Users className="h-6 w-6 text-orange-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Statistics & Actions */}
-        <div className="space-y-6">
-          {/* Participation Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Participation Statistics</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Votes Cast</span>
-                  <span className="font-medium">{results.totalVotes}</span>
+        {/* Winner Announcement */}
+        {winner && winner.vote_count > 0 && (
+          <Card className="mb-8 border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center space-x-4">
+                <Trophy className="h-12 w-12 text-yellow-600" />
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">{winner.name}</h2>
+                  <p className="text-lg text-gray-600">
+                    {winner.vote_count} votes ({winner.percentage}%)
+                  </p>
+                  <Badge className="mt-2 bg-yellow-600 text-white">
+                    🏆 Winner
+                  </Badge>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Eligible Voters</span>
-                  <span className="font-medium">{results.totalEligibleVoters}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Participation Rate</span>
-                  <span className="font-medium">{results.participationRate}%</span>
-                </div>
-                <Progress value={results.participationRate} className="h-2 mt-2" />
               </div>
             </CardContent>
           </Card>
+        )}
 
-          {/* Export Options */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Export & Share</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button 
-                onClick={handleExportPDF} 
-                variant="outline" 
-                className="w-full"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-              <Button 
-                onClick={handleExportCSV} 
-                variant="outline" 
-                className="w-full"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download CSV
-              </Button>
-              <Button 
-                onClick={handleShare} 
-                variant="outline" 
-                className="w-full"
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share Results
-              </Button>
+        {/* No Votes Message */}
+        {results.totalVotes === 0 && (
+          <Card className="mb-8 border-2 border-gray-200 bg-gray-50">
+            <CardContent className="p-6 text-center">
+              <div className="flex items-center justify-center space-x-4">
+                <AlertCircle className="h-12 w-12 text-gray-400" />
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">No Votes Cast Yet</h2>
+                  <p className="text-gray-600">
+                    This election has {results.candidates.length} candidates but no votes have been cast.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
+        )}
 
-          {/* Actions */}
-          <div className="space-y-3">
-            <Button 
-              onClick={() => navigate('/dashboard')} 
-              className="w-full"
-            >
-              Return to Dashboard
-            </Button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Results List */}
+          <div className="lg:col-span-2">
+            <Card className="bg-white border border-gray-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Election Results</CardTitle>
+                <CardDescription className="text-sm text-gray-600">
+                  All candidates ranked by vote count
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {results.candidates.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Candidates</h3>
+                    <p className="text-gray-600">No candidates have been added to this election yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {results.candidates.map((candidate, index) => (
+                      <div key={candidate.id} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                              index === 0 && candidate.vote_count > 0 
+                                ? 'bg-yellow-100 text-yellow-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900">{candidate.name}</h3>
+                              {candidate.party && (
+                                <p className="text-sm text-gray-500">{candidate.party}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-gray-900">{candidate.vote_count} votes</p>
+                            <p className="text-sm text-gray-500">{candidate.percentage}%</p>
+                          </div>
+                        </div>
+                        <Progress 
+                          value={candidate.percentage} 
+                          className={`h-2 ${
+                            index === 0 && candidate.vote_count > 0 
+                              ? 'bg-yellow-100' 
+                              : 'bg-gray-100'
+                          }`}
+                        />
+                        {index < results.candidates.length - 1 && <Separator className="bg-gray-100" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Statistics & Actions */}
+          <div className="space-y-6">
+            {/* Participation Stats */}
+            <Card className="bg-white border border-gray-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Participation Statistics</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Votes Cast</span>
+                      <span className="font-medium text-gray-900">{results.totalVotes}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Eligible Voters</span>
+                      <span className="font-medium text-gray-900">{results.totalEligibleVoters}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Participation Rate</span>
+                      <span className="font-medium text-gray-900">{results.participationRate}%</span>
+                    </div>
+                    <Progress value={results.participationRate} className="h-2 mt-2" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Export Options */}
+            <Card className="bg-white border border-gray-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Export & Share</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  <Button 
+                    onClick={handleExportPDF} 
+                    variant="outline" 
+                    className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </Button>
+                  <Button 
+                    onClick={handleExportCSV} 
+                    variant="outline" 
+                    className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV
+                  </Button>
+                  <Button 
+                    onClick={handleShare} 
+                    variant="outline" 
+                    className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share Results
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Actions */}
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/dashboard')} 
+                className="w-full bg-purple-600 hover:bg-purple-700"
+              >
+                Return to Dashboard
+              </Button>
+            </div>
           </div>
         </div>
       </div>

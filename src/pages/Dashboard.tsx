@@ -133,7 +133,7 @@ const Dashboard = () => {
         start_time: election.start_time,
         end_time: election.end_time,
         is_active: election.is_active,
-        total_votes: election.total_votes || 0,
+        total_votes: 0, // Will be calculated separately if needed
         candidates_count: election.candidates?.length || 0,
         has_voted: votedElectionIds.has(election.id)
       }));
@@ -155,7 +155,6 @@ const Dashboard = () => {
       const activeElections = elections.filter(e => {
         const startTime = new Date(e.start_time);
         const endTime = new Date(e.end_time);
-        // Check if election is active based on is_active flag and current time
         return e.is_active && now >= startTime && now <= endTime;
       }).length;
       const upcomingElections = elections.filter(e => {
@@ -190,16 +189,39 @@ const Dashboard = () => {
     const startTime = new Date(election.start_time);
     const endTime = new Date(election.end_time);
 
-    // First check if the election is marked as active in the database
-    if (election.is_active && now >= startTime && now <= endTime) {
-      return { status: 'active', label: 'Active', color: 'bg-green-100 text-green-800' };
-    } else if (now < startTime) {
-      return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-100 text-blue-800' };
-    } else if (now > endTime) {
-      return { status: 'ended', label: 'Ended', color: 'bg-gray-100 text-gray-800' };
-    } else {
-      return { status: 'inactive', label: 'Inactive', color: 'bg-red-100 text-red-800' };
+    // Get current time in IST
+    const nowIST = new Date();
+    const startTimeIST = new Date(election.start_time);
+    const endTimeIST = new Date(election.end_time);
+
+    // If current time is before start time, it's upcoming
+    if (nowIST < startTimeIST) {
+      return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200' };
+    } 
+    // If current time is after end time, it's ended
+    else if (nowIST > endTimeIST) {
+      return { status: 'ended', label: 'Ended', color: 'bg-gray-600 text-white hover:bg-gray-700 transition-colors duration-200' };
     }
+    // If current time is between start and end, check if it's active
+    else if (election.is_active) {
+      return { status: 'active', label: 'Active', color: 'bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-200' };
+    }
+    // Otherwise it's inactive
+    else {
+      return { status: 'inactive', label: 'Inactive', color: 'bg-red-600 text-white hover:bg-red-700 transition-colors duration-200' };
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
+    });
   };
 
   if (isLoading) {
@@ -320,7 +342,7 @@ const Dashboard = () => {
                     onClick={() => {
                       if (status.status === 'active' && !election.has_voted) {
                         handleVote(election.id);
-                      } else {
+                      } else if (status.status !== 'upcoming') {
                         handleViewResults(election.id);
                       }
                     }}
@@ -341,13 +363,13 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Start:</span>
                           <span className="text-gray-900">
-                            {new Date(election.start_time).toLocaleDateString()}
+                            {formatDateTime(election.start_time)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">End:</span>
                           <span className="text-gray-900">
-                            {new Date(election.end_time).toLocaleDateString()}
+                            {formatDateTime(election.end_time)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
@@ -368,11 +390,23 @@ const Dashboard = () => {
                           className="w-full"
                           variant={status.status === 'active' && !election.has_voted ? 'default' : 'outline'}
                           disabled={status.status !== 'active' || election.has_voted}
+                          onClick={() => {
+                            if (status.status === 'active' && !election.has_voted) {
+                              handleVote(election.id);
+                            } else if (status.status !== 'upcoming') {
+                              handleViewResults(election.id);
+                            }
+                          }}
                         >
                           {status.status === 'active' && !election.has_voted ? (
                             <>
                               <Vote className="h-4 w-4 mr-2" />
                               Vote Now
+                            </>
+                          ) : status.status === 'upcoming' ? (
+                            <>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Coming Soon
                             </>
                           ) : (
                             <>

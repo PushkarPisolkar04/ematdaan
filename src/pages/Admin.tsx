@@ -182,7 +182,15 @@ const Admin = () => {
     try {
       setStatsLoading(true);
       const totalUsers = currentUsers.length;
-      const activeElections = currentElections.filter(e => e.is_active).length;
+      
+      // Calculate active elections based on both is_active flag and time constraints
+      const now = new Date();
+      const activeElections = currentElections.filter(e => {
+        const startTime = new Date(e.start_time);
+        const endTime = new Date(e.end_time);
+        return e.is_active && now >= startTime && now <= endTime;
+      }).length;
+      
       const totalVotes = currentElections.reduce((sum, e) => sum + (e.total_votes || 0), 0);
 
       // Get pending invitations count using the database function
@@ -221,10 +229,14 @@ const Admin = () => {
     try {
       setIsLoading(true);
       
+      // Convert local datetime to UTC for server
+      const startDateUTC = new Date(newElection.startDate).toISOString();
+      const endDateUTC = new Date(newElection.endDate).toISOString();
+      
       await electionApi.createElection({
         name: newElection.name,
-        startTime: newElection.startDate,
-        endTime: newElection.endDate,
+        startTime: startDateUTC,
+        endTime: endDateUTC,
         organizationId: organization?.id
       });
 
@@ -280,25 +292,55 @@ const Admin = () => {
 
     try {
       await electionApi.deleteElection(electionId);
-
       toast({
         title: "Election Deleted",
         description: "Election has been deleted successfully"
       });
-
       await loadElections();
     } catch (error) {
       console.error('Failed to delete election:', error);
       toast({
         title: "Error",
-        description: "Failed to delete election",
+        description: error instanceof Error ? error.message : "Failed to delete election",
         variant: "destructive"
       });
     }
   };
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
+    });
+  };
 
+  const getElectionStatus = (election: any) => {
+    const now = new Date();
+    const startTime = new Date(election.start_time);
+    const endTime = new Date(election.end_time);
 
+    // If current time is before start time, it's upcoming
+    if (now < startTime) {
+      return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200' };
+    } 
+    // If current time is after end time, it's ended
+    else if (now > endTime) {
+      return { status: 'ended', label: 'Ended', color: 'bg-gray-600 text-white hover:bg-gray-700 transition-colors duration-200' };
+    }
+    // If current time is between start and end, check if it's active
+    else if (election.is_active) {
+      return { status: 'active', label: 'Active', color: 'bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-200' };
+    }
+    // Otherwise it's inactive
+    else {
+      return { status: 'inactive', label: 'Inactive', color: 'bg-red-600 text-white hover:bg-red-700 transition-colors duration-200' };
+    }
+  };
 
 
   if (isLoading) {
@@ -429,17 +471,20 @@ const Admin = () => {
                   <CardDescription className="text-sm">Latest election activity</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {elections.slice(0, 5).map((election) => (
-                    <div key={election.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <div>
-                        <p className="font-medium text-sm">{election.name}</p>
-                        <p className="text-xs text-gray-600">{election.total_votes} votes</p>
+                  {elections.slice(0, 5).map((election) => {
+                    const status = getElectionStatus(election);
+                    return (
+                      <div key={election.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                        <div>
+                          <p className="font-medium text-sm">{election.name}</p>
+                          <p className="text-xs text-gray-600">{election.total_votes} votes</p>
+                        </div>
+                        <Badge className={`text-xs ${status.color}`}>
+                          {status.label}
+                        </Badge>
                       </div>
-                      <Badge variant={election.is_active ? "default" : "secondary"} className="text-xs">
-                        {election.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
 
@@ -537,21 +582,26 @@ const Admin = () => {
                       <div>
                         <h3 className="font-medium text-sm">{election.name}</h3>
                         <p className="text-xs text-gray-600">
-                          {new Date(election.start_time).toLocaleDateString()} - {new Date(election.end_time).toLocaleDateString()}
+                          {formatDateTime(election.start_time)} - {formatDateTime(election.end_time)}
                         </p>
                         <p className="text-xs text-gray-600">
                           {election.candidates_count} candidates • {election.total_votes} votes
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant={election.is_active ? "default" : "secondary"} className="text-xs">
-                          {election.is_active ? "Active" : "Inactive"}
-                        </Badge>
+                        {(() => {
+                          const status = getElectionStatus(election);
+                          return (
+                            <Badge className={`text-xs ${status.color}`}>
+                              {status.label}
+                            </Badge>
+                          );
+                        })()}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleToggleElectionStatus(election.id, election.is_active)}
-                          className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                          className="h-7 text-xs bg-purple-600 text-white border-purple-600 hover:bg-purple-700 hover:border-purple-700"
                         >
                           {election.is_active ? "Deactivate" : "Activate"}
                         </Button>
@@ -563,6 +613,20 @@ const Admin = () => {
                         >
                           Manage Candidates
                         </Button>
+
+                        {(() => {
+                          const status = getElectionStatus(election);
+                          return status.status !== 'upcoming' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/results/${election.id}`)}
+                              className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                            >
+                              View Results
+                            </Button>
+                          ) : null;
+                        })()}
 
                         <Button
                           variant="destructive"

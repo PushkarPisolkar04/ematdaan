@@ -21,7 +21,18 @@ const Login = () => {
   const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { login, createOrganization, verifyOrganizationOTP, joinOrganization, userRole } = useAuth();
+  const { login, createOrganization, verifyOrganizationOTP, joinOrganization, userRole, isAuthenticated } = useAuth();
+
+  // Redirect authenticated users
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [isAuthenticated, userRole, navigate]);
 
   // Form data
   const [invitationToken, setInvitationToken] = useState('');
