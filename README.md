@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="public/logo.png" alt="E-Matdaan Logo" width="200" height="auto" />
-  <h1>🗳️ E-Matdaan</h1>
+  <img src="public/logo.png" alt="E-Matdaan Logo" width="auto" height="100" />
+  <h1>E-Matdaan</h1>
   <p><strong>Secure Digital Voting Platform for Organizations</strong></p>
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
