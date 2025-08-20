@@ -119,8 +119,7 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
 
   // Send email using the server endpoint
   try {
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
-    const response = await fetch(`${serverUrl}/send-invitation`, {
+    const response = await fetch('http://localhost:5000/send-invitation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

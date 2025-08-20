@@ -17,7 +17,7 @@ const Login = () => {
   const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { login, createOrganization, verifyOrganizationOTP, joinOrganization } = useAuth();
+  const { login, createOrganization, verifyOrganizationOTP, joinOrganization, userRole } = useAuth();
 
   // Form data
   const [invitationToken, setInvitationToken] = useState('');
@@ -67,7 +67,12 @@ const Login = () => {
     try {
     setIsLoading(true);
       await login(loginData.email, loginData.password);
-      navigate('/dashboard');
+      // Redirect based on user role
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       console.error('Login failed:', error);
     } finally {
@@ -275,11 +280,7 @@ const Login = () => {
                       {isLoading ? 'Signing in...' : 'Sign In'}
                     </Button>
                     </form>
-                    <div className="text-center pt-1">
-                      <Link to="/reset-password" className="text-sm text-[#6B21E8] hover:text-[#6B21E8]/80 hover:underline font-medium">
-                        Forgot your password?
-                      </Link>
-                    </div>
+
                   </TabsContent>
 
                   {/* Join Organization Tab */}

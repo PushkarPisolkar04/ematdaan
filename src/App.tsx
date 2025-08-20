@@ -13,7 +13,7 @@ import VerifyVote from '@/pages/VerifyVote';
 import VoteReceipt from '@/pages/VoteReceipt';
 import Results from '@/pages/Results';
 import Profile from '@/pages/Profile';
-import ResetPassword from '@/pages/ResetPassword';
+
 import ElectionsList from '@/pages/ElectionsList';
 import NotFound from '@/pages/NotFound';
 
@@ -27,7 +27,6 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Redirect old routes */}
             <Route path="/login" element={<Navigate to="/auth" replace />} />
@@ -36,7 +35,7 @@ function App() {
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="student">
                 <Dashboard />
               </ProtectedRoute>
             } />

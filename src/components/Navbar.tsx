@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu, X, User, FileText, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -100,10 +101,17 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" onClick={handleLogoClick} className="flex items-center space-x-3 group">
-              <img src="/logo.png" alt="E-Matdaan" className="h-12 w-auto transition-transform group-hover:scale-105" />
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">E-Matdaan</span>
-            </Link>
+            <div className="flex items-center space-x-3">
+              <Link to="/" onClick={handleLogoClick} className="flex items-center space-x-3 group">
+                <img src="/logo.png" alt="E-Matdaan" className="h-12 w-auto transition-transform group-hover:scale-105" />
+                <span className="text-2xl font-bold text-gray-900 tracking-tight">E-Matdaan</span>
+              </Link>
+              {isAuthenticated && userRole === 'admin' && (
+                <Badge className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 text-xs font-medium">
+                  Admin
+                </Badge>
+              )}
+            </div>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-1">
@@ -186,6 +194,11 @@ export default function Navbar() {
                     <div className="flex items-center space-x-3 mb-8">
                       <img src="/logo.png" alt="E-Matdaan" className="h-8 w-auto" />
                       <span className="text-xl font-bold text-gray-900">E-Matdaan</span>
+                      {isAuthenticated && userRole === 'admin' && (
+                        <Badge className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs font-medium">
+                          Admin
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Mobile Navigation */}

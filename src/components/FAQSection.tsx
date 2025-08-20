@@ -25,7 +25,7 @@ const FAQSection = () => {
     },
     {
       question: "What if I forget my password?",
-      answer: "Use the 'Forgot Password' link on the login page. Enter your email address and we'll send you a secure reset link. The link expires after 24 hours for security. If you continue having issues, contact your organization admin."
+      answer: "Please contact your organization administrator to reset your password. They have the ability to help you regain access to your account."
     },
     {
       question: "Is my personal information safe?",

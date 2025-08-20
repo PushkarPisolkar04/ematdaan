@@ -423,97 +423,96 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-              <p className="text-gray-600">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Admin Dashboard</h1>
+              <p className="text-gray-600 text-sm">
                 {organization?.name} • Manage elections, users, and settings
               </p>
             </div>
-            
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-white border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Users</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+                  <p className="text-xs font-medium text-gray-600">Total Users</p>
+                  <p className="text-xl font-bold text-gray-900">{stats.totalUsers}</p>
                 </div>
-                <Users className="h-8 w-8 text-blue-600" />
+                <Users className="h-6 w-6 text-blue-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="bg-white border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Active Elections</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.activeElections}</p>
+                  <p className="text-xs font-medium text-gray-600">Active Elections</p>
+                  <p className="text-xl font-bold text-gray-900">{stats.activeElections}</p>
                 </div>
-                <Vote className="h-8 w-8 text-green-600" />
+                <Vote className="h-6 w-6 text-purple-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="bg-white border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Votes</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalVotes}</p>
+                  <p className="text-xs font-medium text-gray-600">Total Votes</p>
+                  <p className="text-xl font-bold text-gray-900">{stats.totalVotes}</p>
                 </div>
-                <BarChart3 className="h-8 w-8 text-orange-600" />
+                <BarChart3 className="h-6 w-6 text-indigo-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="bg-white border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Invitations</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.pendingInvitations}</p>
+                  <p className="text-xs font-medium text-gray-600">Pending Invitations</p>
+                  <p className="text-xl font-bold text-gray-900">{stats.pendingInvitations}</p>
                 </div>
-                <Mail className="h-8 w-8 text-purple-600" />
+                <Mail className="h-6 w-6 text-pink-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="elections">Elections</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 bg-white border border-purple-200 shadow-sm">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Overview</TabsTrigger>
+            <TabsTrigger value="elections" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Elections</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Users</TabsTrigger>
+            <TabsTrigger value="invitations" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Invitations</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Elections</CardTitle>
-                  <CardDescription>Latest election activity</CardDescription>
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="bg-white border border-purple-200 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-gray-800">Recent Elections</CardTitle>
+                  <CardDescription className="text-sm">Latest election activity</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {elections.slice(0, 5).map((election) => (
-                    <div key={election.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div key={election.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                       <div>
-                        <p className="font-medium">{election.name}</p>
-                        <p className="text-sm text-gray-600">{election.total_votes} votes</p>
+                        <p className="font-medium text-sm">{election.name}</p>
+                        <p className="text-xs text-gray-600">{election.total_votes} votes</p>
                       </div>
-                      <Badge variant={election.is_active ? "default" : "secondary"}>
+                      <Badge variant={election.is_active ? "default" : "secondary"} className="text-xs">
                         {election.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </div>
@@ -521,19 +520,19 @@ const Admin = () => {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Users</CardTitle>
-                  <CardDescription>Latest user registrations</CardDescription>
+              <Card className="bg-white border border-purple-200 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-gray-800">Recent Users</CardTitle>
+                  <CardDescription className="text-sm">Latest user registrations</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {users.slice(0, 5).map((user) => (
-                    <div key={user.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div key={user.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                       <div>
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-sm text-gray-600">{user.email}</p>
+                        <p className="font-medium text-sm">{user.name}</p>
+                        <p className="text-xs text-gray-600">{user.email}</p>
                       </div>
-                      <Badge variant="outline">{user.role}</Badge>
+                      <Badge variant="outline" className="text-xs border-purple-300 text-purple-700">{user.role}</Badge>
                     </div>
                   ))}
                 </CardContent>
@@ -542,56 +541,60 @@ const Admin = () => {
           </TabsContent>
 
           {/* Elections Tab */}
-          <TabsContent value="elections" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create New Election</CardTitle>
-                <CardDescription>Set up a new election for your organization</CardDescription>
+          <TabsContent value="elections" className="space-y-4">
+            <Card className="bg-white border border-purple-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Create New Election</CardTitle>
+                <CardDescription className="text-sm">Set up a new election for your organization</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateElection} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="pt-0">
+                <form onSubmit={handleCreateElection} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="election-name">Election Name</Label>
+                      <Label htmlFor="election-name" className="text-sm">Election Name</Label>
                       <Input
                         id="election-name"
                         value={newElection.name}
                         onChange={(e) => setNewElection({ ...newElection, name: e.target.value })}
                         placeholder="Enter election name"
+                        className="h-9"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="election-description">Description</Label>
+                      <Label htmlFor="election-description" className="text-sm">Description</Label>
                       <Input
                         id="election-description"
                         value={newElection.description}
                         onChange={(e) => setNewElection({ ...newElection, description: e.target.value })}
                         placeholder="Enter description"
+                        className="h-9"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="start-date">Start Date</Label>
+                      <Label htmlFor="start-date" className="text-sm">Start Date</Label>
                       <Input
                         id="start-date"
                         type="datetime-local"
                         value={newElection.startDate}
                         onChange={(e) => setNewElection({ ...newElection, startDate: e.target.value })}
+                        className="h-9"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="end-date">End Date</Label>
+                      <Label htmlFor="end-date" className="text-sm">End Date</Label>
                       <Input
                         id="end-date"
                         type="datetime-local"
                         value={newElection.endDate}
                         onChange={(e) => setNewElection({ ...newElection, endDate: e.target.value })}
+                        className="h-9"
                         required
                       />
                     </div>
                   </div>
-                  <Button type="submit" disabled={isLoading}>
+                  <Button type="submit" disabled={isLoading} className="bg-purple-600 hover:bg-purple-700 text-white h-9">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Election
                   </Button>
@@ -599,32 +602,33 @@ const Admin = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Manage Elections</CardTitle>
-                <CardDescription>View and manage existing elections</CardDescription>
+            <Card className="bg-white border border-purple-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Manage Elections</CardTitle>
+                <CardDescription className="text-sm">View and manage existing elections</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="pt-0">
+                <div className="space-y-3">
                   {elections.map((election) => (
-                    <div key={election.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={election.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
                       <div>
-                        <h3 className="font-medium">{election.name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <h3 className="font-medium text-sm">{election.name}</h3>
+                        <p className="text-xs text-gray-600">
                           {new Date(election.start_time).toLocaleDateString()} - {new Date(election.end_time).toLocaleDateString()}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-xs text-gray-600">
                           {election.candidates_count} candidates • {election.total_votes} votes
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant={election.is_active ? "default" : "secondary"}>
+                        <Badge variant={election.is_active ? "default" : "secondary"} className="text-xs">
                           {election.is_active ? "Active" : "Inactive"}
                         </Badge>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleToggleElectionStatus(election.id, election.is_active)}
+                          className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
                         >
                           {election.is_active ? "Deactivate" : "Activate"}
                         </Button>
@@ -632,6 +636,7 @@ const Admin = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => navigate(`/admin/elections/${election.id}/candidates`)}
+                          className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
                         >
                           Manage Candidates
                         </Button>
@@ -639,14 +644,16 @@ const Admin = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleGenerateAuditReport(election.id)}
+                          className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
                         >
-                          <FileText className="h-4 w-4 mr-2" />
+                          <FileText className="h-3 w-3 mr-1" />
                           Audit Report
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteElection(election.id)}
+                          className="h-7 text-xs bg-red-500 hover:bg-red-600"
                         >
                           Delete
                         </Button>
@@ -659,28 +666,28 @@ const Admin = () => {
           </TabsContent>
 
           {/* Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Organization Members</CardTitle>
-                <CardDescription>Manage users in your organization</CardDescription>
+          <TabsContent value="users" className="space-y-4">
+            <Card className="bg-white border border-purple-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Organization Members</CardTitle>
+                <CardDescription className="text-sm">Manage users in your organization</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="pt-0">
+                <div className="space-y-3">
                   {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={user.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
                       <div>
-                        <h3 className="font-medium">{user.name}</h3>
-                        <p className="text-sm text-gray-600">{user.email}</p>
-                        <p className="text-sm text-gray-600">
+                        <h3 className="font-medium text-sm">{user.name}</h3>
+                        <p className="text-xs text-gray-600">{user.email}</p>
+                        <p className="text-xs text-gray-600">
                           Joined {new Date(user.joined_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant={user.is_active ? "default" : "secondary"}>
+                        <Badge variant={user.is_active ? "default" : "secondary"} className="text-xs">
                           {user.is_active ? "Active" : "Inactive"}
                         </Badge>
-                        <Badge variant="outline">{user.role}</Badge>
+                        <Badge variant="outline" className="text-xs border-purple-300 text-purple-700 bg-purple-50">{user.role}</Badge>
                       </div>
                     </div>
                   ))}
@@ -690,17 +697,17 @@ const Admin = () => {
           </TabsContent>
 
           {/* Invitations Tab */}
-          <TabsContent value="invitations" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Invite Members</CardTitle>
-                <CardDescription>Send invitations to new members</CardDescription>
+          <TabsContent value="invitations" className="space-y-4">
+            <Card className="bg-white border border-purple-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-gray-800">Invite Members</CardTitle>
+                <CardDescription className="text-sm">Send invitations to new members</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">
+              <CardContent className="pt-0">
+                <p className="text-gray-600 text-sm mb-3">
                   Use the invitation system to add new members to your organization.
                 </p>
-                <Button onClick={() => navigate('/admin/invitations')}>
+                <Button onClick={() => navigate('/admin/invitations')} className="bg-purple-600 hover:bg-purple-700 text-white h-9">
                   <Mail className="h-4 w-4 mr-2" />
                   Manage Invitations
                 </Button>

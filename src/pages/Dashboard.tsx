@@ -56,8 +56,15 @@ const Dashboard = () => {
       navigate('/auth');
       return;
     }
+    
+    // Redirect admins to admin panel
+    if (userRole === 'admin') {
+      navigate('/admin');
+      return;
+    }
+    
     loadDashboardData();
-  }, [isAuthenticated, user, organization]);
+  }, [isAuthenticated, user, organization, userRole]);
 
   const loadDashboardData = async () => {
     if (!user || !organization) return;
@@ -357,45 +364,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
-        {userRole === 'admin' && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Manage your organization and elections</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => navigate('/admin')}
-                    className="h-20 flex flex-col items-center justify-center space-y-2"
-                  >
-                    <Calendar className="h-6 w-6" />
-                    <span>Manage Elections</span>
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => navigate('/admin?tab=members')}
-                    className="h-20 flex flex-col items-center justify-center space-y-2"
-                  >
-                    <User className="h-6 w-6" />
-                    <span>Manage Members</span>
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => navigate('/admin?tab=results')}
-                    className="h-20 flex flex-col items-center justify-center space-y-2"
-                  >
-                    <BarChart3 className="h-6 w-6" />
-                    <span>View Results</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+
       </div>
     </div>
   );

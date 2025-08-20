@@ -36,7 +36,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (userData: Partial<User>) => Promise<void>;
   createOrganization: (data: {
     name: string;
     ownerName: string;
@@ -314,8 +313,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
 
       // Send OTP via backend API
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
-      const response = await fetch(`${serverUrl}/api/organizations/send-otp`, {
+      const response = await fetch('http://localhost:5000/api/organizations/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -374,8 +372,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const orgData = JSON.parse(pendingOrgData);
 
       // Verify OTP and create organization via backend API
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
-      const response = await fetch(`${serverUrl}/api/organizations/verify-otp`, {
+      const response = await fetch('http://localhost:5000/api/organizations/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -541,8 +538,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const otp = generateSecureOTP();
       
       // Send OTP via email using server endpoint
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
-      const response = await fetch(`${serverUrl}/api/send-otp`, {
+      const response = await fetch('http://localhost:5000/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -573,47 +569,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const updateUser = async (userData: Partial<User>): Promise<void> => {
-    if (!user) return;
 
-    try {
-      // Set user context for RLS policies
-      await supabase.rpc('set_user_context', {
-        p_user_id: user.id
-      });
-
-      // Update the user in the database
-      const { error } = await supabase
-        .from('auth_users')
-        .update(userData)
-        .eq('id', user.id);
-
-      if (error) {
-        throw error;
-      }
-
-      // Update the local state
-      const updatedUser = { ...user, ...userData };
-      setUser(updatedUser);
-
-      // Update localStorage
-      localStorage.setItem('user_data', JSON.stringify(updatedUser));
-
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully"
-      });
-
-    } catch (error) {
-      console.error('Failed to update user:', error);
-      toast({
-        title: "Update Failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
 
   const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
     try {
@@ -690,7 +646,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     login,
     logout,
-    updateUser,
     createOrganization,
     verifyOrganizationOTP,
     joinOrganization,
