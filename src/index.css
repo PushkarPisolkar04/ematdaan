@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -95,7 +93,6 @@
   }
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -113,18 +110,15 @@
   background: hsl(var(--primary));
 }
 
-/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
 }
 
-/* Grid pattern for background */
 .bg-grid-pattern {
   background-image: radial-gradient(circle, rgba(0,0,0,0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
-/* Custom animations */
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
@@ -151,7 +145,6 @@ html {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Gradient text */
 .gradient-text {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -159,7 +152,6 @@ html {
   background-clip: text;
 }
 
-/* Glass morphism effect */
 .glass {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(10px);

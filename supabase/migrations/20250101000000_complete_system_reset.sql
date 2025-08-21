@@ -1,12 +1,3 @@
--- COMPLETE SYSTEM RESET MIGRATION
--- This migration drops all existing tables and creates the new system from scratch
--- Run this in Supabase web interface SQL editor
-
--- =====================================================
--- STEP 1: DROP ALL EXISTING TABLES AND FUNCTIONS
--- =====================================================
-
--- Drop all existing tables in reverse dependency order
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS vote_verifications CASCADE;
 DROP TABLE IF EXISTS zk_proofs CASCADE;
@@ -23,7 +14,6 @@ DROP TABLE IF EXISTS user_organizations CASCADE;
 DROP TABLE IF EXISTS auth_users CASCADE;
 DROP TABLE IF EXISTS organizations CASCADE;
 
--- Drop all existing functions
 DROP FUNCTION IF EXISTS generate_invitation_token() CASCADE;
 DROP FUNCTION IF EXISTS generate_session_token() CASCADE;
 DROP FUNCTION IF EXISTS generate_otp() CASCADE;
@@ -33,7 +23,7 @@ DROP FUNCTION IF EXISTS has_user_voted(UUID, UUID) CASCADE;
 DROP FUNCTION IF EXISTS create_user_session(UUID, UUID, INET, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS invalidate_session(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS log_audit_event(UUID, UUID, TEXT, JSONB) CASCADE;
--- Cleanup function drops removed - functions not needed
+
 
 DROP FUNCTION IF EXISTS set_organization_context(UUID) CASCADE;
 DROP FUNCTION IF EXISTS set_user_context(UUID) CASCADE;
@@ -42,8 +32,7 @@ DROP FUNCTION IF EXISTS validate_access_token(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS logout_user_session(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
--- Drop all existing policies
--- Organizations policies
+
 DROP POLICY IF EXISTS "organizations_service_create" ON organizations;
 DROP POLICY IF EXISTS "organizations_service_read" ON organizations;
 DROP POLICY IF EXISTS "organizations_service_update" ON organizations;
@@ -52,7 +41,7 @@ DROP POLICY IF EXISTS "organizations_anon_read" ON organizations;
 DROP POLICY IF EXISTS "organizations_read_own" ON organizations;
 DROP POLICY IF EXISTS "organizations_admin_update" ON organizations;
 
--- Auth users policies
+
 DROP POLICY IF EXISTS "auth_users_service_create" ON auth_users;
 DROP POLICY IF EXISTS "auth_users_service_read" ON auth_users;
 DROP POLICY IF EXISTS "auth_users_service_update" ON auth_users;
@@ -62,7 +51,7 @@ DROP POLICY IF EXISTS "auth_users_read_own" ON auth_users;
 DROP POLICY IF EXISTS "auth_users_update_own" ON auth_users;
 DROP POLICY IF EXISTS "auth_users_admin_read" ON auth_users;
 
--- User organizations policies
+
 DROP POLICY IF EXISTS "user_organizations_service_create" ON user_organizations;
 DROP POLICY IF EXISTS "user_organizations_service_read" ON user_organizations;
 DROP POLICY IF EXISTS "user_organizations_service_update" ON user_organizations;
@@ -72,53 +61,53 @@ DROP POLICY IF EXISTS "user_organizations_read_own" ON user_organizations;
 DROP POLICY IF EXISTS "user_organizations_admin_read" ON user_organizations;
 DROP POLICY IF EXISTS "user_organizations_admin_manage" ON user_organizations;
 
--- Elections policies
+
 DROP POLICY IF EXISTS "elections_service_manage" ON elections;
 DROP POLICY IF EXISTS "elections_read_org" ON elections;
 DROP POLICY IF EXISTS "elections_admin_manage" ON elections;
 DROP POLICY IF EXISTS "elections_authenticated_create" ON elections;
 DROP POLICY IF EXISTS "elections_temp_create" ON elections;
 
--- Candidates policies
+
 DROP POLICY IF EXISTS "candidates_service_manage" ON candidates;
 DROP POLICY IF EXISTS "candidates_read_org" ON candidates;
 DROP POLICY IF EXISTS "candidates_admin_manage" ON candidates;
 
--- Votes policies
+
 DROP POLICY IF EXISTS "votes_service_manage" ON votes;
 DROP POLICY IF EXISTS "votes_read_own" ON votes;
 DROP POLICY IF EXISTS "votes_insert_own" ON votes;
 DROP POLICY IF EXISTS "votes_admin_read" ON votes;
 
--- Encrypted votes policies
+
 DROP POLICY IF EXISTS "encrypted_votes_service_manage" ON encrypted_votes;
 DROP POLICY IF EXISTS "encrypted_votes_read_own" ON encrypted_votes;
 DROP POLICY IF EXISTS "encrypted_votes_insert_own" ON encrypted_votes;
 DROP POLICY IF EXISTS "encrypted_votes_admin_read" ON encrypted_votes;
 
--- Merkle trees policies
+
 DROP POLICY IF EXISTS "merkle_trees_service_manage" ON merkle_trees;
 DROP POLICY IF EXISTS "merkle_trees_read_org" ON merkle_trees;
 DROP POLICY IF EXISTS "merkle_trees_admin_manage" ON merkle_trees;
 
--- ZK proofs policies
+
 DROP POLICY IF EXISTS "zk_proofs_service_manage" ON zk_proofs;
 DROP POLICY IF EXISTS "zk_proofs_read_own" ON zk_proofs;
 DROP POLICY IF EXISTS "zk_proofs_insert_own" ON zk_proofs;
 DROP POLICY IF EXISTS "zk_proofs_admin_read" ON zk_proofs;
 
--- Vote verifications policies
+
 DROP POLICY IF EXISTS "vote_verifications_service_manage" ON vote_verifications;
 DROP POLICY IF EXISTS "vote_verifications_read_own" ON vote_verifications;
 DROP POLICY IF EXISTS "vote_verifications_insert_own" ON vote_verifications;
 DROP POLICY IF EXISTS "vote_verifications_admin_read" ON vote_verifications;
 
--- MFA tokens policies
+
 DROP POLICY IF EXISTS "mfa_tokens_service_manage" ON mfa_tokens;
 DROP POLICY IF EXISTS "mfa_tokens_read_own" ON mfa_tokens;
 DROP POLICY IF EXISTS "mfa_tokens_insert_own" ON mfa_tokens;
 
--- User sessions policies
+
 DROP POLICY IF EXISTS "user_sessions_service_manage" ON user_sessions;
 DROP POLICY IF EXISTS "user_sessions_anon_create" ON user_sessions;
 DROP POLICY IF EXISTS "user_sessions_anon_read" ON user_sessions;
@@ -126,28 +115,24 @@ DROP POLICY IF EXISTS "sessions_read_own" ON user_sessions;
 DROP POLICY IF EXISTS "sessions_insert_own" ON user_sessions;
 DROP POLICY IF EXISTS "sessions_update_own" ON user_sessions;
 
--- OTPs policies
+
 DROP POLICY IF EXISTS "otps_validate" ON otps;
 DROP POLICY IF EXISTS "otps_anon_create" ON otps;
 DROP POLICY IF EXISTS "otps_anon_update" ON otps;
 DROP POLICY IF EXISTS "otps_service_manage" ON otps;
 
--- Access tokens policies
+
 DROP POLICY IF EXISTS "access_tokens_validate" ON access_tokens;
 DROP POLICY IF EXISTS "access_tokens_service_manage" ON access_tokens;
 DROP POLICY IF EXISTS "access_tokens_admin_manage" ON access_tokens;
 
--- Audit logs policies
+
 DROP POLICY IF EXISTS "audit_logs_service_manage" ON audit_logs;
 DROP POLICY IF EXISTS "audit_logs_read_own" ON audit_logs;
 DROP POLICY IF EXISTS "audit_logs_admin_read" ON audit_logs;
 DROP POLICY IF EXISTS "audit_logs_insert" ON audit_logs;
 
--- =====================================================
--- STEP 2: CREATE NEW TABLES
--- =====================================================
 
--- 1. ORGANIZATIONS (Colleges/Schools)
 CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
@@ -162,7 +147,7 @@ CREATE TABLE organizations (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. AUTH_USERS (All users)
+
 CREATE TABLE auth_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL UNIQUE,
@@ -179,7 +164,7 @@ CREATE TABLE auth_users (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. USER_ORGANIZATIONS (User-Org relationships)
+
 CREATE TABLE user_organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
@@ -192,7 +177,7 @@ CREATE TABLE user_organizations (
     UNIQUE(user_id, organization_id)
 );
 
--- 4. ELECTIONS
+
 CREATE TABLE elections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -204,7 +189,7 @@ CREATE TABLE elections (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. CANDIDATES
+
 CREATE TABLE candidates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -214,7 +199,7 @@ CREATE TABLE candidates (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. VOTES (Basic votes)
+
 CREATE TABLE votes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
@@ -225,7 +210,7 @@ CREATE TABLE votes (
     UNIQUE(user_id, election_id)
 );
 
--- 7. ENCRYPTED_VOTES (Advanced vote encryption)
+
 CREATE TABLE encrypted_votes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     election_id UUID NOT NULL REFERENCES elections(id) ON DELETE CASCADE,
@@ -237,7 +222,7 @@ CREATE TABLE encrypted_votes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 8. MERKLE_TREES (Merkle tree for vote verification)
+
 CREATE TABLE merkle_trees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     election_id UUID NOT NULL REFERENCES elections(id) ON DELETE CASCADE,
@@ -248,7 +233,7 @@ CREATE TABLE merkle_trees (
     UNIQUE(election_id)
 );
 
--- 9. ZK_PROOFS (Zero-knowledge proofs)
+
 CREATE TABLE zk_proofs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vote_id UUID NOT NULL REFERENCES encrypted_votes(id) ON DELETE CASCADE,
@@ -260,7 +245,7 @@ CREATE TABLE zk_proofs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 10. VOTE_VERIFICATIONS (Vote verification records)
+
 CREATE TABLE vote_verifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vote_id UUID NOT NULL REFERENCES encrypted_votes(id) ON DELETE CASCADE,
@@ -273,7 +258,7 @@ CREATE TABLE vote_verifications (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 11. MFA_TOKENS (Multi-factor authentication)
+
 CREATE TABLE mfa_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
@@ -284,7 +269,7 @@ CREATE TABLE mfa_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 12. USER_SESSIONS (Session management)
+
 CREATE TABLE user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
@@ -297,7 +282,7 @@ CREATE TABLE user_sessions (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
--- 13. OTPS (OTP verification)
+
 CREATE TABLE otps (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL,
@@ -309,7 +294,7 @@ CREATE TABLE otps (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 14. ACCESS_TOKENS (Invitations - COMPLEX & LONG)
+
 CREATE TABLE access_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     token TEXT UNIQUE NOT NULL, -- 64+ character complex token
@@ -324,7 +309,7 @@ CREATE TABLE access_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 15. STUDENT_INVITATIONS (Student invitation system)
+
 CREATE TABLE student_invitations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -338,7 +323,7 @@ CREATE TABLE student_invitations (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 16. AUDIT_LOGS (Security tracking)
+
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -350,11 +335,7 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- =====================================================
--- STEP 3: CREATE INDEXES FOR PERFORMANCE
--- =====================================================
 
--- Core tables indexes
 CREATE INDEX idx_auth_users_email ON auth_users(email);
 CREATE INDEX idx_user_organizations_user ON user_organizations(user_id);
 CREATE INDEX idx_user_organizations_org ON user_organizations(organization_id);
@@ -363,7 +344,7 @@ CREATE INDEX idx_candidates_election ON candidates(election_id);
 CREATE INDEX idx_votes_user_election ON votes(user_id, election_id);
 CREATE INDEX idx_votes_election ON votes(election_id);
 
--- Advanced security tables indexes
+
 CREATE INDEX idx_encrypted_votes_election ON encrypted_votes(election_id);
 CREATE INDEX idx_encrypted_votes_voter ON encrypted_votes(voter_id);
 CREATE INDEX idx_merkle_trees_election ON merkle_trees(election_id);
@@ -374,7 +355,7 @@ CREATE INDEX idx_vote_verifications_voter ON vote_verifications(voter_id);
 CREATE INDEX idx_mfa_tokens_user ON mfa_tokens(user_id);
 CREATE INDEX idx_mfa_tokens_expires ON mfa_tokens(expires_at);
 
--- Session & verification tables indexes
+
 CREATE INDEX idx_user_sessions_token ON user_sessions(session_token);
 CREATE INDEX idx_user_sessions_user ON user_sessions(user_id);
 CREATE INDEX idx_access_tokens_token ON access_tokens(token);
@@ -384,17 +365,13 @@ CREATE INDEX idx_otps_otp ON otps(otp);
 CREATE INDEX idx_audit_logs_org ON audit_logs(organization_id);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 
--- Student invitations indexes
+
 CREATE INDEX idx_student_invitations_org ON student_invitations(organization_id);
 CREATE INDEX idx_student_invitations_token ON student_invitations(invitation_token);
 CREATE INDEX idx_student_invitations_email ON student_invitations(email);
 CREATE INDEX idx_student_invitations_expires ON student_invitations(expires_at);
 
--- =====================================================
--- STEP 4: CREATE FUNCTIONS
--- =====================================================
 
--- Generate complex invitation tokens (64+ characters)
 CREATE OR REPLACE FUNCTION generate_invitation_token()
 RETURNS TEXT AS $$
 BEGIN
@@ -403,7 +380,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Generate complex session tokens (64+ characters)
 CREATE OR REPLACE FUNCTION generate_session_token()
 RETURNS TEXT AS $$
 BEGIN
@@ -412,7 +388,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Generate complex OTP (6 digits)
 CREATE OR REPLACE FUNCTION generate_otp()
 RETURNS TEXT AS $$
 BEGIN
@@ -420,7 +395,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Generate access code for invitations
 CREATE OR REPLACE FUNCTION generate_access_code()
 RETURNS TEXT AS $$
 BEGIN
@@ -429,7 +403,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Validate access token
 CREATE OR REPLACE FUNCTION validate_access_token(p_token TEXT)
 RETURNS TABLE(
     token_id UUID,
@@ -458,7 +431,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Logout user session
 CREATE OR REPLACE FUNCTION logout_user_session(p_session_token TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -480,7 +452,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Set organization context for RLS
 CREATE OR REPLACE FUNCTION set_organization_context(p_organization_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -488,7 +459,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Set user context for RLS
 CREATE OR REPLACE FUNCTION set_user_context(p_user_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -496,7 +466,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Validate invitation token
 CREATE OR REPLACE FUNCTION validate_invitation_token(p_token TEXT)
 RETURNS TABLE(
     token_id UUID,
@@ -525,7 +494,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Validate session token
 CREATE OR REPLACE FUNCTION validate_session(p_session_token TEXT)
 RETURNS TABLE(
     user_id UUID,
@@ -546,7 +514,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Check if user has voted
 CREATE OR REPLACE FUNCTION has_user_voted(p_user_id UUID, p_election_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -557,7 +524,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Mark invitation as used function
 CREATE OR REPLACE FUNCTION mark_invitation_used(p_invitation_id UUID, p_user_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -567,7 +533,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create user session
 CREATE OR REPLACE FUNCTION create_user_session(
     p_user_id UUID,
     p_organization_id UUID,
@@ -603,7 +568,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Invalidate session
 CREATE OR REPLACE FUNCTION invalidate_session(p_session_token TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -625,7 +589,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Log audit events
 CREATE OR REPLACE FUNCTION log_audit_event(
     p_organization_id UUID,
     p_user_id UUID,
@@ -652,15 +615,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- =====================================================
--- COMPLETE CLEANUP SYSTEM
--- =====================================================
 
--- Cleanup functions removed - not needed for remote Supabase deployment
-
-
-
--- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -669,11 +624,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =====================================================
--- STEP 5: ENABLE ROW LEVEL SECURITY
--- =====================================================
 
--- Enable RLS on all tables
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_organizations ENABLE ROW LEVEL SECURITY;
@@ -690,37 +641,27 @@ ALTER TABLE otps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE access_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- =====================================================
--- STEP 6: CREATE RLS POLICIES
--- =====================================================
 
--- ORGANIZATIONS
--- Allow service role to create organizations (for registration)
 CREATE POLICY "organizations_service_create" ON organizations
     FOR INSERT TO service_role
     WITH CHECK (true);
 
--- Allow service role to read organizations (for validation)
 CREATE POLICY "organizations_service_read" ON organizations
     FOR SELECT TO service_role
     USING (true);
 
--- Allow service role to update organizations (for admin operations)
 CREATE POLICY "organizations_service_update" ON organizations
     FOR UPDATE TO service_role
     USING (true);
 
--- Allow anon users to create organizations (for registration)
 CREATE POLICY "organizations_anon_create" ON organizations
     FOR INSERT TO anon
     WITH CHECK (true);
 
--- Allow anon users to read organizations (for validation)
 CREATE POLICY "organizations_anon_read" ON organizations
     FOR SELECT TO anon
     USING (true);
 
--- Allow authenticated users to read their own organizations
 CREATE POLICY "organizations_read_own" ON organizations
     FOR SELECT TO authenticated
     USING (id IN (
@@ -728,7 +669,6 @@ CREATE POLICY "organizations_read_own" ON organizations
         WHERE user_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow organization admins to update their organization
 CREATE POLICY "organizations_admin_update" ON organizations
     FOR UPDATE TO authenticated
     USING (id IN (
@@ -737,43 +677,34 @@ CREATE POLICY "organizations_admin_update" ON organizations
         AND role = 'admin'
     ));
 
--- AUTH_USERS
--- Allow service role to create users (for registration)
 CREATE POLICY "auth_users_service_create" ON auth_users
     FOR INSERT TO service_role
     WITH CHECK (true);
 
--- Allow service role to read users (for login validation)
 CREATE POLICY "auth_users_service_read" ON auth_users
     FOR SELECT TO service_role
     USING (true);
 
--- Allow service role to update users (for password reset, login attempts)
 CREATE POLICY "auth_users_service_update" ON auth_users
     FOR UPDATE TO service_role
     USING (true);
 
--- Allow anon users to create users (for registration)
 CREATE POLICY "auth_users_anon_create" ON auth_users
     FOR INSERT TO anon
     WITH CHECK (true);
 
--- Allow anon users to read users (for login validation)
 CREATE POLICY "auth_users_anon_read" ON auth_users
     FOR SELECT TO anon
     USING (true);
 
--- Allow users to read their own data
 CREATE POLICY "auth_users_read_own" ON auth_users
     FOR SELECT TO authenticated
     USING (id = current_setting('app.user_id')::uuid);
 
--- Allow users to update their own data
 CREATE POLICY "auth_users_update_own" ON auth_users
     FOR UPDATE TO authenticated
     USING (id = current_setting('app.user_id')::uuid);
 
--- Allow organization admins to read users in their organization
 CREATE POLICY "auth_users_admin_read" ON auth_users
     FOR SELECT TO authenticated
     USING (id IN (
@@ -785,38 +716,30 @@ CREATE POLICY "auth_users_admin_read" ON auth_users
         )
     ));
 
--- USER_ORGANIZATIONS
--- Allow service role to create user-org relationships (for registration)
 CREATE POLICY "user_organizations_service_create" ON user_organizations
     FOR INSERT TO service_role
     WITH CHECK (true);
 
--- Allow service role to read user-org relationships
 CREATE POLICY "user_organizations_service_read" ON user_organizations
     FOR SELECT TO service_role
     USING (true);
 
--- Allow service role to update user-org relationships
 CREATE POLICY "user_organizations_service_update" ON user_organizations
     FOR UPDATE TO service_role
     USING (true);
 
--- Allow anon users to create user-org relationships (for registration)
 CREATE POLICY "user_organizations_anon_create" ON user_organizations
     FOR INSERT TO anon
     WITH CHECK (true);
 
--- Allow anon users to read user-org relationships
 CREATE POLICY "user_organizations_anon_read" ON user_organizations
     FOR SELECT TO anon
     USING (true);
 
--- Allow users to read their own relationships
 CREATE POLICY "user_organizations_read_own" ON user_organizations
     FOR SELECT TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- Allow organization admins to read all relationships in their organization
 CREATE POLICY "user_organizations_admin_read" ON user_organizations
     FOR SELECT TO authenticated
     USING (organization_id IN (
@@ -825,7 +748,6 @@ CREATE POLICY "user_organizations_admin_read" ON user_organizations
         AND role = 'admin'
     ));
 
--- Allow organization admins to manage relationships in their organization
 CREATE POLICY "user_organizations_admin_manage" ON user_organizations
     FOR ALL TO authenticated
     USING (organization_id IN (
@@ -839,13 +761,10 @@ CREATE POLICY "user_organizations_admin_manage" ON user_organizations
         AND role = 'admin'
     ));
 
--- ELECTIONS
--- Allow service role to manage elections
 CREATE POLICY "elections_service_manage" ON elections
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read elections in their organization
 CREATE POLICY "elections_read_org" ON elections
     FOR SELECT TO authenticated
     USING (organization_id IN (
@@ -853,7 +772,6 @@ CREATE POLICY "elections_read_org" ON elections
         WHERE user_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow organization admins to manage elections
 CREATE POLICY "elections_admin_manage" ON elections
     FOR ALL TO authenticated
     USING (organization_id IN (
@@ -867,7 +785,6 @@ CREATE POLICY "elections_admin_manage" ON elections
         AND role = 'admin'
     ));
 
--- Allow authenticated users to create elections in their organization (for testing)
 CREATE POLICY "elections_authenticated_create" ON elections
     FOR INSERT TO authenticated
     WITH CHECK (organization_id IN (
@@ -875,18 +792,14 @@ CREATE POLICY "elections_authenticated_create" ON elections
         WHERE user_id = current_setting('app.user_id')::uuid
     ));
 
--- Temporary policy to allow any authenticated user to create elections (for debugging)
 CREATE POLICY "elections_temp_create" ON elections
     FOR INSERT TO authenticated
     WITH CHECK (true);
 
--- CANDIDATES
--- Allow service role to manage candidates
 CREATE POLICY "candidates_service_manage" ON candidates
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read candidates in their organization's elections
 CREATE POLICY "candidates_read_org" ON candidates
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -895,7 +808,6 @@ CREATE POLICY "candidates_read_org" ON candidates
         WHERE uo.user_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow organization admins to manage candidates
 CREATE POLICY "candidates_admin_manage" ON candidates
     FOR ALL TO authenticated
     USING (election_id IN (
@@ -911,18 +823,14 @@ CREATE POLICY "candidates_admin_manage" ON candidates
         AND uo.role = 'admin'
     ));
 
--- VOTES
--- Allow service role to manage votes
 CREATE POLICY "votes_service_manage" ON votes
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own votes
 CREATE POLICY "votes_read_own" ON votes
     FOR SELECT TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- Allow users to insert their own votes (with duplicate check)
 CREATE POLICY "votes_insert_own" ON votes
     FOR INSERT TO authenticated
     WITH CHECK (
@@ -934,7 +842,6 @@ CREATE POLICY "votes_insert_own" ON votes
         )
     );
 
--- Allow organization admins to read votes in their elections
 CREATE POLICY "votes_admin_read" ON votes
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -944,23 +851,18 @@ CREATE POLICY "votes_admin_read" ON votes
         AND uo.role = 'admin'
     ));
 
--- ENCRYPTED_VOTES
--- Allow service role to manage encrypted votes
 CREATE POLICY "encrypted_votes_service_manage" ON encrypted_votes
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own encrypted votes
 CREATE POLICY "encrypted_votes_read_own" ON encrypted_votes
     FOR SELECT TO authenticated
     USING (voter_id = current_setting('app.user_id')::uuid);
 
--- Allow users to insert their own encrypted votes
 CREATE POLICY "encrypted_votes_insert_own" ON encrypted_votes
     FOR INSERT TO authenticated
     WITH CHECK (voter_id = current_setting('app.user_id')::uuid);
 
--- Allow organization admins to read encrypted votes in their elections
 CREATE POLICY "encrypted_votes_admin_read" ON encrypted_votes
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -970,13 +872,10 @@ CREATE POLICY "encrypted_votes_admin_read" ON encrypted_votes
         AND uo.role = 'admin'
     ));
 
--- MERKLE_TREES
--- Allow service role to manage merkle trees
 CREATE POLICY "merkle_trees_service_manage" ON merkle_trees
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read merkle trees in their organization's elections
 CREATE POLICY "merkle_trees_read_org" ON merkle_trees
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -985,7 +884,6 @@ CREATE POLICY "merkle_trees_read_org" ON merkle_trees
         WHERE uo.user_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow organization admins to manage merkle trees
 CREATE POLICY "merkle_trees_admin_manage" ON merkle_trees
     FOR ALL TO authenticated
     USING (election_id IN (
@@ -995,13 +893,10 @@ CREATE POLICY "merkle_trees_admin_manage" ON merkle_trees
         AND uo.role = 'admin'
     ));
 
--- ZK_PROOFS
--- Allow service role to manage ZK proofs
 CREATE POLICY "zk_proofs_service_manage" ON zk_proofs
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own ZK proofs
 CREATE POLICY "zk_proofs_read_own" ON zk_proofs
     FOR SELECT TO authenticated
     USING (vote_id IN (
@@ -1009,7 +904,6 @@ CREATE POLICY "zk_proofs_read_own" ON zk_proofs
         WHERE voter_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow users to insert their own ZK proofs
 CREATE POLICY "zk_proofs_insert_own" ON zk_proofs
     FOR INSERT TO authenticated
     WITH CHECK (vote_id IN (
@@ -1017,7 +911,6 @@ CREATE POLICY "zk_proofs_insert_own" ON zk_proofs
         WHERE voter_id = current_setting('app.user_id')::uuid
     ));
 
--- Allow organization admins to read ZK proofs in their elections
 CREATE POLICY "zk_proofs_admin_read" ON zk_proofs
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -1027,23 +920,18 @@ CREATE POLICY "zk_proofs_admin_read" ON zk_proofs
         AND uo.role = 'admin'
     ));
 
--- VOTE_VERIFICATIONS
--- Allow service role to manage vote verifications
 CREATE POLICY "vote_verifications_service_manage" ON vote_verifications
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own vote verifications
 CREATE POLICY "vote_verifications_read_own" ON vote_verifications
     FOR SELECT TO authenticated
     USING (voter_id = current_setting('app.user_id')::uuid);
 
--- Allow users to insert their own vote verifications
 CREATE POLICY "vote_verifications_insert_own" ON vote_verifications
     FOR INSERT TO authenticated
     WITH CHECK (voter_id = current_setting('app.user_id')::uuid);
 
--- Allow organization admins to read vote verifications in their elections
 CREATE POLICY "vote_verifications_admin_read" ON vote_verifications
     FOR SELECT TO authenticated
     USING (election_id IN (
@@ -1053,86 +941,66 @@ CREATE POLICY "vote_verifications_admin_read" ON vote_verifications
         AND uo.role = 'admin'
     ));
 
--- MFA_TOKENS
--- Allow service role to manage MFA tokens
 CREATE POLICY "mfa_tokens_service_manage" ON mfa_tokens
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own MFA tokens
 CREATE POLICY "mfa_tokens_read_own" ON mfa_tokens
     FOR SELECT TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- Allow users to insert their own MFA tokens
 CREATE POLICY "mfa_tokens_insert_own" ON mfa_tokens
     FOR INSERT TO authenticated
     WITH CHECK (user_id = current_setting('app.user_id')::uuid);
 
--- USER_SESSIONS
--- Allow service role to manage sessions
 CREATE POLICY "user_sessions_service_manage" ON user_sessions
     FOR ALL TO service_role
     USING (true);
 
--- Allow anon users to create sessions (for login)
 CREATE POLICY "user_sessions_anon_create" ON user_sessions
     FOR INSERT TO anon
     WITH CHECK (true);
 
--- Allow anon users to read sessions (for validation)
 CREATE POLICY "user_sessions_anon_read" ON user_sessions
     FOR SELECT TO anon
     USING (true);
 
--- Allow users to read their own sessions
 CREATE POLICY "sessions_read_own" ON user_sessions
     FOR SELECT TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- Allow users to insert their own sessions
 CREATE POLICY "sessions_insert_own" ON user_sessions
     FOR INSERT TO authenticated
     WITH CHECK (user_id = current_setting('app.user_id')::uuid);
 
--- Allow users to update their own sessions (for logout)
 CREATE POLICY "sessions_update_own" ON user_sessions
     FOR UPDATE TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- OTPS
--- Allow anonymous users to validate OTPs (for registration/login)
 CREATE POLICY "otps_validate" ON otps
     FOR SELECT TO anon
     USING (true);
 
--- Allow anonymous users to create OTPs (for registration)
 CREATE POLICY "otps_anon_create" ON otps
     FOR INSERT TO anon
     WITH CHECK (true);
 
--- Allow anonymous users to update OTPs (for verification)
 CREATE POLICY "otps_anon_update" ON otps
     FOR UPDATE TO anon
     USING (true);
 
--- Allow service role to manage OTPs
 CREATE POLICY "otps_service_manage" ON otps
     FOR ALL TO service_role
     USING (true);
 
--- ACCESS_TOKENS
--- Allow anonymous users to validate access tokens (for invitations)
 CREATE POLICY "access_tokens_validate" ON access_tokens
     FOR SELECT TO anon
     USING (true);
 
--- Allow service role to manage access tokens
 CREATE POLICY "access_tokens_service_manage" ON access_tokens
     FOR ALL TO service_role
     USING (true);
 
--- Allow organization admins to manage access tokens
 CREATE POLICY "access_tokens_admin_manage" ON access_tokens
     FOR ALL TO authenticated
     USING (organization_id IN (
@@ -1141,15 +1009,11 @@ CREATE POLICY "access_tokens_admin_manage" ON access_tokens
         AND role = 'admin'
     ));
 
--- STUDENT_INVITATIONS
--- Enable RLS
 ALTER TABLE student_invitations ENABLE ROW LEVEL SECURITY;
 
--- Service role policies (for backend operations)
 CREATE POLICY "student_invitations_service_manage" ON student_invitations
     FOR ALL USING (auth.role() = 'service_role');
 
--- Organization admin policies
 CREATE POLICY "student_invitations_admin_manage" ON student_invitations
     FOR ALL USING (
         EXISTS (
@@ -1160,7 +1024,6 @@ CREATE POLICY "student_invitations_admin_manage" ON student_invitations
         )
     );
 
--- Read policy for organization members
 CREATE POLICY "student_invitations_read_org" ON student_invitations
     FOR SELECT USING (
         EXISTS (
@@ -1170,18 +1033,14 @@ CREATE POLICY "student_invitations_read_org" ON student_invitations
         )
     );
 
--- AUDIT_LOGS
--- Allow service role to manage audit logs
 CREATE POLICY "audit_logs_service_manage" ON audit_logs
     FOR ALL TO service_role
     USING (true);
 
--- Allow users to read their own audit logs
 CREATE POLICY "audit_logs_read_own" ON audit_logs
     FOR SELECT TO authenticated
     USING (user_id = current_setting('app.user_id')::uuid);
 
--- Allow organization admins to read audit logs in their organization
 CREATE POLICY "audit_logs_admin_read" ON audit_logs
     FOR SELECT TO authenticated
     USING (organization_id IN (
@@ -1190,16 +1049,10 @@ CREATE POLICY "audit_logs_admin_read" ON audit_logs
         AND role = 'admin'
     ));
 
--- Allow authenticated users to insert audit logs
 CREATE POLICY "audit_logs_insert" ON audit_logs
     FOR INSERT TO authenticated
     WITH CHECK (true);
 
--- =====================================================
--- STEP 7: CREATE TRIGGERS FOR UPDATED_AT
--- =====================================================
-
--- Create triggers for updated_at
 CREATE TRIGGER update_organizations_updated_at 
     BEFORE UPDATE ON organizations 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -1213,11 +1066,6 @@ CREATE TRIGGER update_student_invitations_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 
--- =====================================================
--- MIGRATION COMPLETE
--- =====================================================
-
--- Log the migration completion
 INSERT INTO audit_logs (action, details) 
 VALUES (
     'migration_completed',

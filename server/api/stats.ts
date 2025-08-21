@@ -8,20 +8,19 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdw
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Get global platform statistics
+
 router.get('/platform', async (req, res) => {
-  try {
-    // Get total registered users (from auth_users table)
+  try { 
     const { count: totalUsers } = await supabase
       .from('auth_users')
       .select('id', { count: 'exact', head: true });
 
-    // Get total votes across all elections
+    
     const { count: totalVotes } = await supabase
       .from('votes')
       .select('id', { count: 'exact', head: true });
 
-    // Get truly active elections count (is_active = true AND end_time >= now)
+    
     const now = new Date().toISOString();
     const { count: activeElections } = await supabase
       .from('elections')
@@ -29,7 +28,7 @@ router.get('/platform', async (req, res) => {
       .eq('is_active', true)
       .gte('end_time', now);
 
-    // Get completed elections count (end_time < now)
+    
     const { count: completedElections } = await supabase
       .from('elections')
       .select('id', { count: 'exact', head: true })
@@ -48,20 +47,20 @@ router.get('/platform', async (req, res) => {
   }
 });
 
-// Get today's statistics
+
 router.get('/today', async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
 
-    // Get votes cast today
+    
     const { count: votesToday } = await supabase
       .from('votes')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', todayISO);
 
-    // Get users registered today (from auth_users table)
+    
     const { count: usersToday } = await supabase
       .from('auth_users')
       .select('id', { count: 'exact', head: true })

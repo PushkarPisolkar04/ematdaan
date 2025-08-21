@@ -69,19 +69,16 @@ const VotePage = () => {
     try {
       setLoading(true);
 
-      // Load election data using the API
       const electionData = await electionApi.getElection(electionId);
 
       if (!electionData) {
         throw new Error('Election not found');
       }
 
-      // Verify the election belongs to the user's organization
       if (electionData.organization_id !== organization.id) {
         throw new Error('Election not found');
       }
 
-      // If candidates are not included in the election data, load them separately
       if (!electionData.candidates || electionData.candidates.length === 0) {
         try {
           const candidatesData = await candidateApi.getCandidates(electionId);
@@ -94,7 +91,6 @@ const VotePage = () => {
 
       setElection(electionData);
       
-      // Check if user has already voted in this election
       try {
         const hasVotedStatus = await votingApi.hasVoted(user.id, electionId);
         setHasVoted(hasVotedStatus);
@@ -119,7 +115,6 @@ const VotePage = () => {
   const handleVote = async () => {
     if (!selectedCandidate || !election || !user) return;
 
-    // Double-check if user has already voted
     if (hasVoted) {
       toast({
         title: "Already Voted",
@@ -131,8 +126,7 @@ const VotePage = () => {
 
     try {
       setVoting(true);
-
-      // Cast the vote
+      
       const voteResult = await votingApi.castVote({
         candidateId: selectedCandidate,
         electionId: election.id,
@@ -144,11 +138,9 @@ const VotePage = () => {
         description: "Your vote has been successfully submitted"
       });
 
-      // Update voting status
       setHasVoted(true);
       setShowConfirmationDialog(false);
 
-      // Navigate back to dashboard after a short delay
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
       }, 2000);
@@ -218,7 +210,6 @@ const VotePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="mb-8">
           <Button 
             variant="ghost" 
@@ -249,7 +240,6 @@ const VotePage = () => {
           </div>
         </div>
 
-        {/* Election Info - Compact */}
         <Card className="mb-6 bg-white border border-gray-200 shadow-sm">
           <CardContent className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -275,7 +265,6 @@ const VotePage = () => {
           </CardContent>
         </Card>
 
-        {/* Voting Section */}
         {hasVoted ? (
           <Card className="bg-green-50 border-green-200 shadow-lg">
             <CardContent className="p-8 text-center">
@@ -308,7 +297,6 @@ const VotePage = () => {
           </Card>
         ) : (
           <>
-            {/* Candidate Selection - Prominent */}
             <Card className="mb-6 bg-white border-2 border-purple-200 shadow-lg">
               <CardHeader className="pb-4 bg-purple-50 border-b border-purple-100">
                 <CardTitle className="text-2xl text-purple-900">
@@ -374,7 +362,6 @@ const VotePage = () => {
               </CardContent>
             </Card>
 
-            {/* Vote Security Info - Compact */}
             <Card className="bg-gray-50 border border-gray-200 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2 mb-3">
@@ -403,7 +390,6 @@ const VotePage = () => {
           </>
         )}
 
-        {/* Vote Confirmation Dialog */}
         <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
           <DialogContent className="sm:max-w-md" title="Confirm Vote">
             <DialogHeader>

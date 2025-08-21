@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react';  
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -24,16 +24,13 @@ function App() {
         <div className="App">
           <Navbar />
           <Routes>
-            {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Login />} />
             
-            {/* Redirect old routes */}
             <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/register" element={<Navigate to="/auth" replace />} />
             <Route path="/saas" element={<Navigate to="/" replace />} />
             
-            {/* Protected routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute requiredRole="student">
                 <Dashboard />
@@ -84,7 +81,6 @@ function App() {
               </ProtectedRoute>
             } />
             
-            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />

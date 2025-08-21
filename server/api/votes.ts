@@ -2,12 +2,10 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-// Load environment variables from the project root
 dotenv.config({ path: '.env' });
 
 const router = express.Router();
 
-// Initialize Supabase client with service role key
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -19,12 +17,11 @@ if (!serviceRoleKey) {
 
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Cast vote endpoint
+
 router.post('/cast', async (req, res) => {
   try {
     const { candidateId, electionId, userId } = req.body;
 
-    // Validate input
     if (!candidateId || !electionId || !userId) {
       return res.status(400).json({
         success: false,
@@ -32,7 +29,6 @@ router.post('/cast', async (req, res) => {
       });
     }
 
-    // Check if user has already voted in this election
     const { data: existingVote, error: checkError } = await supabase
       .from('votes')
       .select('id')
@@ -56,7 +52,6 @@ router.post('/cast', async (req, res) => {
       });
     }
 
-    // Validate that the candidate exists and belongs to the election
     const { data: candidate, error: candidateError } = await supabase
       .from('candidates')
       .select('id')
@@ -71,7 +66,6 @@ router.post('/cast', async (req, res) => {
       });
     }
 
-    // Validate that the election is active and voting is open
     const { data: election, error: electionError } = await supabase
       .from('elections')
       .select('id, start_time, end_time, is_active')
@@ -110,10 +104,8 @@ router.post('/cast', async (req, res) => {
       });
     }
 
-    // Create vote hash
     const voteHash = `${userId}-${electionId}-${Date.now()}`;
 
-    // Insert the vote using service role (bypasses RLS)
     const { data: voteData, error: voteError } = await supabase
       .from('votes')
       .insert([{
@@ -150,7 +142,6 @@ router.post('/cast', async (req, res) => {
   }
 });
 
-// Check if user has voted endpoint
 router.get('/has-voted/:userId/:electionId', async (req, res) => {
   try {
     const { userId, electionId } = req.params;
@@ -194,7 +185,6 @@ router.get('/has-voted/:userId/:electionId', async (req, res) => {
   }
 });
 
-// Check voting status for multiple elections endpoint
 router.post('/bulk-voting-status', async (req, res) => {
   try {
     const { userId, electionIds } = req.body;
@@ -242,7 +232,6 @@ router.post('/bulk-voting-status', async (req, res) => {
   }
 });
 
-// Get vote results for an election endpoint
 router.get('/results/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
@@ -254,7 +243,7 @@ router.get('/results/:electionId', async (req, res) => {
       });
     }
 
-    // Get all candidates for the election first
+
     const { data: candidates, error: candidatesError } = await supabase
       .from('candidates')
       .select(`
@@ -274,7 +263,7 @@ router.get('/results/:electionId', async (req, res) => {
       });
     }
 
-    // Get all votes for the election
+
     const { data: votes, error: votesError } = await supabase
       .from('votes')
       .select('candidate_id')
@@ -289,13 +278,13 @@ router.get('/results/:electionId', async (req, res) => {
       });
     }
 
-    // Count votes per candidate
+
     const voteCounts: { [key: string]: number } = {};
     votes?.forEach(vote => {
       voteCounts[vote.candidate_id] = (voteCounts[vote.candidate_id] || 0) + 1;
     });
 
-    // Create results with all candidates, including those with 0 votes
+
     const results = candidates?.map(candidate => ({
       candidate: candidate,
       votes: voteCounts[candidate.id] || 0
@@ -316,7 +305,7 @@ router.get('/results/:electionId', async (req, res) => {
   }
 });
 
-// Get user's vote for a specific election endpoint
+
 router.get('/user-vote/:userId/:electionId', async (req, res) => {
   try {
     const { userId, electionId } = req.params;
@@ -328,7 +317,7 @@ router.get('/user-vote/:userId/:electionId', async (req, res) => {
       });
     }
 
-    // Get the user's vote for this election with candidate details
+
     const { data: vote, error } = await supabase
       .from('votes')
       .select(`
@@ -361,7 +350,7 @@ router.get('/user-vote/:userId/:electionId', async (req, res) => {
       });
     }
 
-    // Transform the data to match the expected format
+      
     const voteData = {
       id: vote.id,
       vote_hash: vote.vote_hash,

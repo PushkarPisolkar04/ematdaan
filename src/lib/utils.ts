@@ -32,13 +32,10 @@ export function formatTimeRemaining(startTime: string, endTime: string): string 
   let diff: number;
   
   if (now < start) {
-    // Election hasn't started yet
     diff = start.getTime() - now.getTime();
   } else if (now <= end) {
-    // Election is active
     diff = end.getTime() - now.getTime();
   } else {
-    // Election has ended
     return 'Election ended';
   }
   

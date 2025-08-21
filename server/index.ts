@@ -11,22 +11,19 @@ import authRouter from './api/auth';
 import statsRouter from './api/stats';
 import votesRouter from './api/votes';
 
-// Load environment variables from the project root
 dotenv.config({ path: '.env' });
 
 const app = express();
 
-// Security middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://ematdaan.vercel.app'] // Your Vercel domain
+    ? ['https://ematdaan.vercel.app'] 
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
   credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
 
-// Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -36,7 +33,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting for email endpoints
 const emailRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // Limit each IP to 5 requests per windowMs
@@ -48,24 +44,21 @@ const emailRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Email validation function
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) && email.length <= 254;
 };
 
-// Create nodemailer transporter
 const transporter = nodemailer.createTransport({
   host: process.env.VITE_SMTP_HOST,
   port: parseInt(process.env.VITE_SMTP_PORT || '587'),
-  secure: false, // true for 465, false for other ports
+  secure: false, 
   auth: {
     user: process.env.VITE_SMTP_USER,
     pass: process.env.VITE_SMTP_PASS,
   },
 });
 
-// Test email configuration on startup
 transporter.verify((error, success) => {
   if (error) {
     console.error('SMTP configuration error:', error);
@@ -74,12 +67,10 @@ transporter.verify((error, success) => {
   }
 });
 
-// Send OTP endpoint
 app.post('/api/send-otp', emailRateLimit, async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // Validate input
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
@@ -87,7 +78,6 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
       });
     }
 
-    // Validate email format
     if (!isValidEmail(email)) {
       return res.status(400).json({
         success: false,
@@ -95,7 +85,6 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
       });
     }
 
-    // Validate OTP format (should be 6 digits)
     if (!/^\d{6}$/.test(otp)) {
       return res.status(400).json({
         success: false,
@@ -122,7 +111,6 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
-    // Log error securely without exposing sensitive data
     console.error('Failed to send OTP email - Error type:', error instanceof Error ? error.constructor.name : typeof error);
     res.status(500).json({
       success: false,
@@ -131,12 +119,11 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
   }
 });
 
-// Send invitation endpoint
+
 app.post('/send-invitation', emailRateLimit, async (req, res) => {
   try {
     const { to, subject, html } = req.body;
 
-    // Validate input
     if (!to || !subject || !html) {
       return res.status(400).json({
         success: false,
@@ -144,7 +131,6 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
       });
     }
 
-    // Validate email format
     if (!isValidEmail(to)) {
       return res.status(400).json({
         success: false,
@@ -152,7 +138,6 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
       });
     }
 
-    // Validate subject length
     if (subject.length > 200) {
       return res.status(400).json({
         success: false,
@@ -160,7 +145,6 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
       });
     }
 
-    // Validate HTML content length
     if (html.length > 50000) {
       return res.status(400).json({
         success: false,
@@ -180,7 +164,6 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
       message: 'Invitation email sent successfully',
     });
   } catch (error) {
-    // Log error securely without exposing sensitive data
     console.error('Failed to send invitation email - Error type:', error instanceof Error ? error.constructor.name : typeof error);
     res.status(500).json({
       success: false,
@@ -189,28 +172,20 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
   }
 });
 
-// Organizations routes
 app.use('/api/organizations', organizationsRouter);
 
-// Elections routes
 app.use('/api/elections', electionsRouter);
 
-// Candidates routes
 app.use('/api/candidates', candidatesRouter);
 
-// Invitations routes
 app.use('/api/invitations', invitationsRouter);
 
-// Auth routes
 app.use('/api/auth', authRouter);
 
-// Stats routes
 app.use('/api/stats', statsRouter);
 
-// Votes routes
 app.use('/api/votes', votesRouter);
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });

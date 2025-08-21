@@ -84,7 +84,6 @@ const Admin = () => {
   const navigate = useNavigate();
   const { user, organization, userRole, isAuthenticated } = useAuth();
 
-  // Form states
   const [newElection, setNewElection] = useState({
     name: '',
     startDate: '',
@@ -111,7 +110,6 @@ const Admin = () => {
     loadAdminData();
   }, [isAuthenticated, userRole, organization]);
 
-  // Recalculate stats when users or elections change
   useEffect(() => {
     if ((users.length > 0 || elections.length > 0) && organization?.id) {
       loadStats(users, elections);
@@ -144,7 +142,6 @@ const Admin = () => {
       const electionsData = await electionApi.getElections(organization?.id);
       
       const processedElections = await Promise.all((electionsData || []).map(async (election) => {
-        // Get vote count for this election using server API
         let totalVotes = 0;
         try {
           const voteResults = await votingApi.getVoteResults(election.id);
@@ -208,11 +205,9 @@ const Admin = () => {
     try {
       setStatsLoading(true);
       
-      // Count only students (eligible voters), excluding admins
       const eligibleVoters = currentUsers.filter(user => user.role === 'student').length;
-      const totalUsers = currentUsers.length; // Keep total users for other purposes
+      const totalUsers = currentUsers.length;
       
-      // Calculate active elections based on both is_active flag and time constraints
       const now = new Date();
       const activeElections = currentElections.filter(e => {
         const startTime = new Date(e.start_time);
@@ -222,7 +217,6 @@ const Admin = () => {
       
       const totalVotes = currentElections.reduce((sum, e) => sum + (e.total_votes || 0), 0);
 
-      // Get pending invitations count using the database function
       const { data: invitationStats } = await supabase.rpc('get_invitation_stats', {
         p_organization_id: organization?.id
       });
@@ -230,7 +224,7 @@ const Admin = () => {
       const pendingInvitations = invitationStats?.[0]?.pending_invitations || 0;
 
       setStats({
-        totalUsers: eligibleVoters, // Use eligible voters count instead of total users
+        totalUsers: eligibleVoters,
         activeElections,
         totalVotes,
         pendingInvitations: pendingInvitations || 0
@@ -258,7 +252,6 @@ const Admin = () => {
     try {
       setIsLoading(true);
       
-      // Convert local datetime to UTC for server
       const startDateUTC = new Date(newElection.startDate).toISOString();
       const endDateUTC = new Date(newElection.endDate).toISOString();
       
@@ -353,19 +346,15 @@ const Admin = () => {
     const startTime = new Date(election.start_time);
     const endTime = new Date(election.end_time);
 
-    // If current time is before start time, it's upcoming
     if (now < startTime) {
       return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200' };
     } 
-    // If current time is after end time, it's ended
     else if (now > endTime) {
       return { status: 'ended', label: 'Ended', color: 'bg-gray-600 text-white hover:bg-gray-700 transition-colors duration-200' };
     }
-    // If current time is between start and end, check if it's active
     else if (election.is_active) {
       return { status: 'active', label: 'Active', color: 'bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-200' };
     }
-    // Otherwise it's inactive
     else {
       return { status: 'inactive', label: 'Inactive', color: 'bg-red-600 text-white hover:bg-red-700 transition-colors duration-200' };
     }
@@ -386,7 +375,7 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
+
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -407,7 +396,6 @@ const Admin = () => {
           </div>
         </div>
 
-        {/* Enhanced Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
@@ -494,7 +482,6 @@ const Admin = () => {
           </Card>
         </div>
 
-        {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-white border border-purple-200 shadow-sm">
             <TabsTrigger value="overview" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Overview</TabsTrigger>
@@ -504,7 +491,6 @@ const Admin = () => {
             <TabsTrigger value="invitations" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">Invitations</TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="bg-white border border-gray-200 shadow-sm">
@@ -588,7 +574,6 @@ const Admin = () => {
             </div>
           </TabsContent>
 
-          {/* Elections Tab */}
           <TabsContent value="elections" className="space-y-6">
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardHeader className="pb-3">
@@ -734,7 +719,7 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
-          {/* Users Tab */}
+
           <TabsContent value="users" className="space-y-6">
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardHeader className="pb-3">
@@ -770,7 +755,7 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
-          {/* Analytics Tab */}
+
           <TabsContent value="analytics" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="bg-white border border-gray-200 shadow-sm">
@@ -784,7 +769,7 @@ const Admin = () => {
                 <CardContent className="pt-0">
                   <div className="space-y-4">
                     {elections.slice(0, 5).map((election) => {
-                      // Calculate participation rate based on eligible voters only
+
                       const eligibleVoters = users.filter(user => user.role === 'student').length;
                       const participationRate = eligibleVoters > 0 ? 
                         ((election.total_votes || 0) / eligibleVoters) * 100 : 0;
@@ -843,7 +828,7 @@ const Admin = () => {
             </div>
           </TabsContent>
 
-          {/* Invitations Tab */}
+                          
           <TabsContent value="invitations" className="space-y-6">
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardHeader className="pb-3">

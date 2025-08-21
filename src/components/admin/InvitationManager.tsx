@@ -32,7 +32,6 @@ interface StudentInvitation {
   created_at: string;
 }
 
-// Helper function to validate email
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -69,11 +68,9 @@ const InvitationManager: React.FC = () => {
         throw new Error('No organization ID found');
       }
       
-      // Load stats
       const invitationStats = await invitationApi.getInvitationStats(organization.id);
       setStats(invitationStats);
       
-      // Load invitations
       const orgInvitations = await invitationApi.getInvitations(organization.id);
       setInvitations(orgInvitations);
       
@@ -119,11 +116,9 @@ const InvitationManager: React.FC = () => {
         throw new Error('No organization ID found');
       }
       
-      // Parse CSV file to extract emails (each line is an email address)
       const csvText = await selectedFile.text();
       const lines = csvText.split('\n').filter(line => line.trim());
       
-      // Extract emails (treat each line as an email address)
       const emails = [];
       for (const line of lines) {
         const email = line.trim();
@@ -147,10 +142,8 @@ const InvitationManager: React.FC = () => {
           description: `${result.count} invitations sent successfully`,
         });
         
-        // Reload data
         await loadInvitationData();
         
-        // Clear file selection
         setSelectedFile(null);
         const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
@@ -203,7 +196,6 @@ const InvitationManager: React.FC = () => {
         throw new Error('No organization ID found');
       }
 
-      // Extract emails from manual invitations
       const emails = validInvitations.map(inv => inv.email.trim());
       
       const result = await invitationApi.createInvitations({
@@ -217,10 +209,8 @@ const InvitationManager: React.FC = () => {
           description: `${result.count} invitations sent successfully`,
         });
         
-        // Reload data
         await loadInvitationData();
         
-        // Reset form
         setManualInvitations([{ email: '' }]);
       }
     } catch (error) {
@@ -239,7 +229,6 @@ const InvitationManager: React.FC = () => {
     try {
       setDeletingInvitation(invitationId);
       
-      // Use the server endpoint to delete invitation (bypasses RLS)
       const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/invitations/delete/${invitationId}`, {
         method: 'DELETE',
         headers: {
@@ -258,7 +247,6 @@ const InvitationManager: React.FC = () => {
         description: "Invitation has been successfully deleted",
       });
       
-      // Reload data
       await loadInvitationData();
     } catch (error) {
       toast({
@@ -306,7 +294,7 @@ student3@college.edu`;
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
+  
         <div className="mb-8">
           <Button
             onClick={() => navigate('/admin')}
@@ -330,7 +318,6 @@ student3@college.edu`;
         </div>
 
         <div className="space-y-8">
-          {/* Enhanced Stats Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card className="border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">

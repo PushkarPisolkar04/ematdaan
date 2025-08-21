@@ -51,17 +51,14 @@ const Profile: React.FC = () => {
     if (!user) return;
 
     try {
-      // Get all elections for the organization
       const electionsData = await electionApi.getElections(organization?.id);
       
-      // Check which elections the user has voted in
       const voteHistory: VoteHistory[] = [];
       
       for (const election of electionsData || []) {
         try {
           const hasVoted = await votingApi.hasVoted(user.id, election.id);
           if (hasVoted) {
-            // Get vote details using server API instead of direct Supabase query
             try {
               const API_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
               const response = await fetch(`${API_BASE_URL}/api/votes/user-vote/${user.id}/${election.id}`, {
@@ -97,7 +94,6 @@ const Profile: React.FC = () => {
         }
       }
 
-      // Sort by creation date (most recent first)
       voteHistory.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       setVoteHistory(voteHistory);
@@ -129,7 +125,6 @@ const Profile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
@@ -151,7 +146,6 @@ const Profile: React.FC = () => {
         </div>
 
         {userRole === 'admin' ? (
-          // Admin view - no tabs, just show personal info
           <div className="space-y-6">
             <Card className="bg-white border border-gray-200 shadow-lg">
               <CardHeader className="pb-4">
@@ -191,14 +185,12 @@ const Profile: React.FC = () => {
             </Card>
           </div>
         ) : (
-          // Student view - with tabs
           <Tabs defaultValue="personal" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 bg-white border border-gray-200 shadow-sm">
               <TabsTrigger value="personal" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-base">Personal Info</TabsTrigger>
               <TabsTrigger value="history" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-base">Vote History</TabsTrigger>
             </TabsList>
 
-            {/* Personal Information Tab */}
             <TabsContent value="personal" className="space-y-6">
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardHeader className="pb-4">
@@ -295,7 +287,6 @@ const Profile: React.FC = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-
 
           </Tabs>
         )}

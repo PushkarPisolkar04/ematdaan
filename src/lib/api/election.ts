@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase';
 
 export const createElection = async (name: string, startTime: Date, endTime: Date) => {
   try {
-    // Create election in database
     const { data: election, error } = await supabase
       .from('elections')
       .insert({
@@ -172,7 +171,7 @@ export const getPastElections = async () => {
 
     if (error) throw error;
 
-    // Transform the data to match the ElectionResult interface
+            
     return (elections as ElectionData[]).map(election => {
       const totalVotes = Number(election.total_votes || 0);
       const totalRegistered = Number(election.total_registered || 0);

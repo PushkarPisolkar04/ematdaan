@@ -1,4 +1,3 @@
-// Validation utilities for forms
 
 export interface ValidationError {
   field: string;
@@ -10,13 +9,11 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-// Email validation
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// Password validation
 export const validatePassword = (password: string): ValidationResult => {
   const errors: ValidationError[] = [];
   
@@ -46,7 +43,6 @@ export const validatePassword = (password: string): ValidationResult => {
   };
 };
 
-// Organization name validation
 export const validateOrganizationName = (name: string): ValidationResult => {
   const errors: ValidationError[] = [];
   
@@ -66,7 +62,6 @@ export const validateOrganizationName = (name: string): ValidationResult => {
   };
 };
 
-// Person name validation
 export const validatePersonName = (name: string): ValidationResult => {
   const errors: ValidationError[] = [];
   
@@ -86,7 +81,6 @@ export const validatePersonName = (name: string): ValidationResult => {
   };
 };
 
-// Organization creation form validation
 export const validateOrganizationForm = (data: {
   name: string;
   ownerName: string;
@@ -96,26 +90,21 @@ export const validateOrganizationForm = (data: {
 }): ValidationResult => {
   const errors: ValidationError[] = [];
   
-  // Validate organization name
   const nameValidation = validateOrganizationName(data.name);
   errors.push(...nameValidation.errors);
   
-  // Validate owner name
   const ownerNameValidation = validatePersonName(data.ownerName);
   errors.push(...ownerNameValidation.errors);
   
-  // Validate email
   if (!data.ownerEmail.trim()) {
     errors.push({ field: 'ownerEmail', message: 'Email is required' });
   } else if (!validateEmail(data.ownerEmail)) {
     errors.push({ field: 'ownerEmail', message: 'Please enter a valid email address' });
   }
   
-  // Validate password
   const passwordValidation = validatePassword(data.password);
   errors.push(...passwordValidation.errors);
   
-  // Validate password confirmation
   if (data.password !== data.confirmPassword) {
     errors.push({ field: 'confirmPassword', message: 'Passwords do not match' });
   }
@@ -126,7 +115,6 @@ export const validateOrganizationForm = (data: {
   };
 };
 
-// Login form validation
 export const validateLoginForm = (data: {
   email: string;
 }): ValidationResult => {
@@ -144,7 +132,6 @@ export const validateLoginForm = (data: {
   };
 };
 
-// Registration form validation
 export const validateRegistrationForm = (data: {
   name: string;
   email: string;
@@ -153,22 +140,18 @@ export const validateRegistrationForm = (data: {
 }): ValidationResult => {
   const errors: ValidationError[] = [];
   
-  // Validate name
   const nameValidation = validatePersonName(data.name);
   errors.push(...nameValidation.errors);
   
-  // Validate email
   if (!data.email.trim()) {
     errors.push({ field: 'email', message: 'Email is required' });
   } else if (!validateEmail(data.email)) {
     errors.push({ field: 'email', message: 'Please enter a valid email address' });
   }
   
-  // Validate password
   const passwordValidation = validatePassword(data.password);
   errors.push(...passwordValidation.errors);
   
-  // Validate password confirmation
   if (data.password !== data.confirmPassword) {
     errors.push({ field: 'confirmPassword', message: 'Passwords do not match' });
   }
@@ -179,7 +162,6 @@ export const validateRegistrationForm = (data: {
   };
 };
 
-// Election form validation
 export const validateElectionForm = (data: {
   name: string;
   description: string;
@@ -188,7 +170,6 @@ export const validateElectionForm = (data: {
 }): ValidationResult => {
   const errors: ValidationError[] = [];
   
-  // Validate name
   if (!data.name.trim()) {
     errors.push({ field: 'name', message: 'Election name is required' });
   } else if (data.name.length < 3) {
@@ -197,12 +178,10 @@ export const validateElectionForm = (data: {
     errors.push({ field: 'name', message: 'Election name must be less than 100 characters' });
   }
   
-  // Validate description
   if (data.description && data.description.length > 500) {
     errors.push({ field: 'description', message: 'Description must be less than 500 characters' });
   }
   
-  // Validate dates
   const now = new Date();
   const startTime = new Date(data.startTime);
   const endTime = new Date(data.endTime);
@@ -221,7 +200,6 @@ export const validateElectionForm = (data: {
   };
 };
 
-// Candidate form validation
 export const validateCandidateForm = (data: {
   name: string;
   party: string;
@@ -229,7 +207,6 @@ export const validateCandidateForm = (data: {
 }): ValidationResult => {
   const errors: ValidationError[] = [];
   
-  // Validate name
   if (!data.name.trim()) {
     errors.push({ field: 'name', message: 'Candidate name is required' });
   } else if (data.name.length < 2) {
@@ -238,12 +215,10 @@ export const validateCandidateForm = (data: {
     errors.push({ field: 'name', message: 'Candidate name must be less than 50 characters' });
   }
   
-  // Validate party (optional but if provided, validate)
   if (data.party && data.party.length > 50) {
     errors.push({ field: 'party', message: 'Party name must be less than 50 characters' });
   }
   
-  // Validate symbol (optional but if provided, validate)
   if (data.symbol && data.symbol.length > 20) {
     errors.push({ field: 'symbol', message: 'Symbol must be less than 20 characters' });
   }
@@ -253,8 +228,7 @@ export const validateCandidateForm = (data: {
     errors
   };
 };
-
-// Access code validation
+    
 export const validateAccessCode = (code: string): ValidationResult => {
   const errors: ValidationError[] = [];
   

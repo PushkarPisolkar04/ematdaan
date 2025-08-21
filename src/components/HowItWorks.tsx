@@ -46,7 +46,7 @@ const HowItWorks = () => {
           </p>
         </div>
 
-        {/* Quick Start Guide */}
+
         <div className="max-w-4xl mx-auto mb-16">
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200">
             <CardHeader>
@@ -96,7 +96,7 @@ const HowItWorks = () => {
           </Card>
         </div>
 
-        {/* Detailed Steps */}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
           {steps.map((step, index) => (
             <Card key={index} className="relative hover:shadow-lg transition-all duration-300 hover:-translate-y-2">
@@ -123,7 +123,7 @@ const HowItWorks = () => {
           ))}
         </div>
 
-        {/* Organization Management */}
+
         <div className="max-w-4xl mx-auto mb-16">
           <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
             <CardHeader>
@@ -162,8 +162,7 @@ const HowItWorks = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Security Features */}
+        
         <div className="max-w-4xl mx-auto">
           <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200">
             <CardHeader>

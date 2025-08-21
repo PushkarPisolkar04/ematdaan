@@ -72,10 +72,8 @@ const ElectionsList: React.FC = () => {
 
         const data = await electionApi.getElections(organization.id);
         
-        // Enhance elections with additional data
         const enhancedElections = await Promise.all(
           (data || []).map(async (election) => {
-            // Get total votes using server API
             let totalVotes = 0;
             try {
               const voteResults = await votingApi.getVoteResults(election.id);
@@ -167,7 +165,6 @@ const ElectionsList: React.FC = () => {
     });
   };
 
-  // Separate elections by status
   const activeElections = elections.filter(election => {
     const status = getElectionStatus(election);
     return status.status === 'active';
@@ -201,13 +198,11 @@ const ElectionsList: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Elections</h1>
           <p className="text-xl text-gray-600">Manage and monitor all elections in your organization</p>
         </div>
 
-        {/* Enhanced Quick Stats Summary */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
@@ -270,9 +265,7 @@ const ElectionsList: React.FC = () => {
           </Card>
         </div>
 
-        {/* Elections List */}
         <div className="mb-8">
-          {/* Active Elections Section */}
           {activeElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -326,7 +319,6 @@ const ElectionsList: React.FC = () => {
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="space-y-4">
-                          {/* Election Progress */}
                           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-green-800">Voting in Progress</span>
@@ -338,7 +330,6 @@ const ElectionsList: React.FC = () => {
                             </p>
                           </div>
 
-                          {/* Action Buttons */}
                           <div className="flex gap-3 pt-2">
                             <Button 
                               onClick={() => navigate(`/vote/${election.id}`)}
@@ -365,7 +356,6 @@ const ElectionsList: React.FC = () => {
             </div>
           )}
 
-          {/* Upcoming Elections Section */}
           {upcomingElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -439,7 +429,6 @@ const ElectionsList: React.FC = () => {
             </div>
           )}
 
-          {/* Completed Elections Section */}
           {completedElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -516,8 +505,7 @@ const ElectionsList: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* No Elections Message */}
+    
           {elections.length === 0 && (
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardContent className="p-12 text-center">

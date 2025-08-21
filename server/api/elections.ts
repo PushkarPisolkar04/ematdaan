@@ -2,12 +2,12 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-// Load environment variables from the project root
+
 dotenv.config({ path: '.env' });
 
 const router = express.Router();
 
-// Initialize Supabase client with service role key
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -19,12 +19,11 @@ if (!serviceRoleKey) {
 
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Create election endpoint
+
 router.post('/create', async (req, res) => {
   try {
     const { name, startTime, endTime, organizationId } = req.body;
 
-    // Validate input
     if (!name || !startTime || !endTime || !organizationId) {
       return res.status(400).json({
         success: false,
@@ -32,7 +31,6 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Validate organization exists
     const { data: existingOrg, error: orgCheckError } = await supabase
       .from('organizations')
       .select('id')
@@ -46,7 +44,6 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Create election
     const { data: electionData, error: electionError } = await supabase
       .from('elections')
       .insert({
@@ -84,7 +81,6 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// Get elections for organization endpoint
 router.get('/organization/:organizationId', async (req, res) => {
   try {
     const { organizationId } = req.params;
@@ -134,7 +130,6 @@ router.get('/organization/:organizationId', async (req, res) => {
   }
 });
 
-// Get active elections for organization endpoint
 router.get('/active/:organizationId', async (req, res) => {
   try {
     const { organizationId } = req.params;
@@ -191,7 +186,7 @@ router.get('/active/:organizationId', async (req, res) => {
   }
 });
 
-// Update election endpoint
+
 router.put('/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
@@ -242,7 +237,7 @@ router.put('/:electionId', async (req, res) => {
   }
 });
 
-// Delete election endpoint
+
 router.delete('/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
@@ -283,7 +278,6 @@ router.delete('/:electionId', async (req, res) => {
   }
 });
 
-// Get election details endpoint
 router.get('/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;

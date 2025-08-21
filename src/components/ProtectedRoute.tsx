@@ -15,7 +15,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isLoading, userRole } = useAuth();
   const location = useLocation();
 
-  // Show loading spinner while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -27,21 +26,16 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Check role-based access if required
   if (requiredRole && userRole !== requiredRole) {
-    // Redirect based on user's actual role
     if (userRole === 'admin') {
       return <Navigate to="/admin" replace />;
     } else {
       return <Navigate to="/dashboard" replace />;
     }
   }
-
-  // User is authenticated and has required role (if specified)
   return <>{children}</>;
 }; 

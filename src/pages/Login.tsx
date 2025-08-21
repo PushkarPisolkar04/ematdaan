@@ -23,7 +23,6 @@ const Login = () => {
   const navigate = useNavigate();
   const { login, createOrganization, verifyOrganizationOTP, joinOrganization, userRole, isAuthenticated } = useAuth();
 
-  // Redirect authenticated users
   useEffect(() => {
     if (isAuthenticated) {
       if (userRole === 'admin') {
@@ -34,7 +33,6 @@ const Login = () => {
     }
   }, [isAuthenticated, userRole, navigate]);
 
-  // Form data
   const [invitationToken, setInvitationToken] = useState('');
   const [invitationValidation, setInvitationValidation] = useState<any>(null);
   const [validatingInvitation, setValidatingInvitation] = useState(false);
@@ -56,13 +54,11 @@ const Login = () => {
     confirmPassword: ''
   });
 
-  // Check for invitation token or tab in URL
   useEffect(() => {
     const token = searchParams.get('invitation');
     const tab = searchParams.get('tab');
     
     if (token) {
-      // Decode the token and fix spaces to + characters
       const decodedToken = decodeURIComponent(token).replace(/ /g, '+');
       setInvitationToken(decodedToken);
       setActiveTab('join');
@@ -84,7 +80,6 @@ const Login = () => {
       setInvitationValidation(validation);
       
       if (validation.is_valid) {
-        // Auto-fill the email field with the invitation email
         setJoinData(prev => ({ ...prev, email: validation.email }));
       }
     } catch (error) {
@@ -112,14 +107,12 @@ const Login = () => {
     try {
       setIsLoading(true);
       await login(loginData.email, loginData.password);
-      // Redirect based on user role
       if (userRole === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (error) {
-      // Error is already handled in the login function with toast notification
       console.error('Login failed:', error);
     } finally {
       setIsLoading(false);
@@ -157,7 +150,6 @@ const Login = () => {
       });
       
       if (result.requiresOTP) {
-        // Show OTP form
         setShowOTPForm(true);
         setPendingEmail(orgData.ownerEmail);
         toast({
@@ -165,7 +157,6 @@ const Login = () => {
           description: "Please check your email for the verification code",
         });
       } else {
-        // Organization created without OTP
         toast({
           title: "Organization Created",
           description: "Your organization has been created successfully. You can now log in."
@@ -201,12 +192,10 @@ const Login = () => {
     try {
       await verifyOrganizationOTP(pendingEmail, otpValue);
       
-      // Close the OTP form
       setShowOTPForm(false);
       setOtpValue('');
       setPendingEmail('');
       
-      // Reset form data
       setOrgData({
         name: '',
         ownerName: '',
@@ -220,7 +209,6 @@ const Login = () => {
         description: "Your organization has been created successfully! You can now log in."
       });
       
-      // Switch to login tab with email pre-filled
       setActiveTab('login');
       setLoginData({ email: orgData.ownerEmail, password: '' });
     } catch (error) {
@@ -292,7 +280,6 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-start justify-center p-4 pt-20">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mt-8">
-        {/* Left Side - Auth Form */}
         <div className="flex items-start justify-center">
           <div className="w-full max-w-md">
             <Card className="w-full shadow-xl border-0 bg-white/90 backdrop-blur-sm">
@@ -308,7 +295,6 @@ const Login = () => {
                     <TabsTrigger value="create" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm">Create Org</TabsTrigger>
                   </TabsList>
 
-                  {/* Login Tab */}
                   <TabsContent value="login" className="space-y-3 mt-3">
                     <form onSubmit={handleLogin} className="space-y-2">
                       <div className="space-y-1">
@@ -342,7 +328,6 @@ const Login = () => {
 
                   </TabsContent>
 
-                  {/* Join Organization Tab */}
                   <TabsContent value="join" className="space-y-3 mt-3">
                     <form onSubmit={handleJoinOrganization} className="space-y-2">
                                             <div className="space-y-1">
@@ -457,7 +442,6 @@ const Login = () => {
                 </form>
                   </TabsContent>
 
-                  {/* Create Organization Tab */}
                   <TabsContent value="create" className="space-y-3 mt-3">
                     <form onSubmit={handleCreateOrganization} className="space-y-2">
                       <div className="space-y-1">
@@ -525,7 +509,6 @@ const Login = () => {
                       </Button>
                     </form>
 
-                    {/* OTP Verification Form */}
                     {showOTPForm && (
                       <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <h3 className="text-sm font-semibold text-gray-900 mb-3">Verify Your Email</h3>

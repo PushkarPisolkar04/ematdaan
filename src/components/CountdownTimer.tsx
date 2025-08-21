@@ -15,13 +15,11 @@ const CountdownTimer = ({ startTime, endTime }: CountdownTimerProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get server time and calculate difference
     const syncServerTime = async () => {
       try {
         const { data, error } = await supabase.rpc('get_server_time');
         if (error) {
           console.error('Failed to sync server time:', error);
-          // Fallback to client time if server time fails
           setServerTime(new Date());
         } else {
           setServerTime(new Date(data));
@@ -33,11 +31,9 @@ const CountdownTimer = ({ startTime, endTime }: CountdownTimerProps) => {
         setIsLoading(false);
       }
     };
-
-    // Initial sync
+      
     syncServerTime();
 
-    // Sync every minute
     const syncInterval = setInterval(syncServerTime, 60000);
 
     return () => clearInterval(syncInterval);

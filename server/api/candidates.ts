@@ -2,12 +2,12 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-// Load environment variables from the project root
+
 dotenv.config({ path: '.env' });
 
 const router = express.Router();
 
-// Initialize Supabase client with service role key
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -19,12 +19,12 @@ if (!serviceRoleKey) {
 
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Create candidate endpoint
+
 router.post('/create', async (req, res) => {
   try {
     const { name, party, symbol, electionId } = req.body;
 
-    // Validate input
+
     if (!name || !party || !symbol || !electionId) {
       return res.status(400).json({
         success: false,
@@ -32,7 +32,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Validate election exists
+
     const { data: existingElection, error: electionCheckError } = await supabase
       .from('elections')
       .select('id')
@@ -46,7 +46,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Create candidate
+
     const { data: candidateData, error: candidateError } = await supabase
       .from('candidates')
       .insert({
@@ -83,7 +83,7 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// Get candidates for election endpoint
+
 router.get('/election/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
@@ -125,7 +125,7 @@ router.get('/election/:electionId', async (req, res) => {
   }
 });
 
-// Update candidate endpoint
+
 router.put('/:candidateId', async (req, res) => {
   try {
     const { candidateId } = req.params;
@@ -181,7 +181,7 @@ router.put('/:candidateId', async (req, res) => {
   }
 });
 
-// Delete candidate endpoint
+
 router.delete('/:candidateId', async (req, res) => {
   try {
     const { candidateId } = req.params;

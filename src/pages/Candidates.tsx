@@ -80,7 +80,6 @@ const Candidates: React.FC = () => {
     try {
       setLoading(true);
 
-      // Load election details using backend API
       try {
         const electionData = await electionApi.getElection(electionId);
         setElection(electionData);
@@ -94,7 +93,6 @@ const Candidates: React.FC = () => {
         return;
       }
 
-      // Load candidates using backend API
       try {
         const candidatesData = await candidateApi.getCandidates(electionId);
         setCandidates(candidatesData || []);
@@ -130,11 +128,10 @@ const Candidates: React.FC = () => {
       return;
     }
 
-    // Quick server health check
     try {
       const healthResponse = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/health`, { 
         method: 'GET',
-        signal: AbortSignal.timeout(3000) // 3 second timeout
+        signal: AbortSignal.timeout(3000)
       });
       if (!healthResponse.ok) {
         toast({
@@ -271,7 +268,6 @@ const Candidates: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="mb-8">
           <Button
             onClick={() => navigate('/admin')}
@@ -304,7 +300,6 @@ const Candidates: React.FC = () => {
           </div>
         </div>
 
-        {/* Add Candidate Form */}
         {isAddingCandidate && (
           <Card className="mb-8 border-purple-200 shadow-lg">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
@@ -367,8 +362,7 @@ const Candidates: React.FC = () => {
             </CardContent>
           </Card>
         )}
-
-        {/* Candidates List */}
+  
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {candidates.map((candidate) => (
             <Card key={candidate.id} className="border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">

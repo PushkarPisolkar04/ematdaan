@@ -66,25 +66,21 @@ const Results: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get election details using the API
       const election = await electionApi.getElection(electionId);
 
       if (!election) {
         throw new Error('Election not found');
       }
 
-      // Verify the election belongs to the user's organization
       if (election.organization_id !== organization.id) {
         throw new Error('Election not found');
       }
 
-      // Get candidates first using the API
       let candidates;
       try {
         const candidatesData = await candidateApi.getCandidates(electionId);
         candidates = candidatesData;
       } catch (apiError) {
-        // Fallback to direct Supabase query
         const { data: candidatesData, error: candidatesError } = await supabase
           .from('candidates')
           .select(`
@@ -101,10 +97,8 @@ const Results: React.FC = () => {
         candidates = candidatesData;
       }
 
-      // Get vote results using server API
       const voteResults = await votingApi.getVoteResults(electionId);
       
-      // Combine candidates with vote counts - ensure all candidates are included
       const candidatesWithVotes = candidates?.map(candidate => {
         const voteResult = voteResults.find((result: any) => result.candidate.id === candidate.id);
         return {
@@ -113,10 +107,8 @@ const Results: React.FC = () => {
         };
       }) || [];
 
-      // Calculate total votes
       const totalVotes = voteResults.reduce((total: number, result: any) => total + (result as any).votes, 0);
 
-      // Get total eligible voters (organization members excluding admins)
       const { count: totalEligibleVoters, error: votersError } = await supabase
         .from('user_organizations')
         .select('*', { count: 'exact', head: true })
@@ -128,7 +120,6 @@ const Results: React.FC = () => {
         throw votersError;
       }
 
-      // Process candidates data
       const processedCandidates: Candidate[] = candidatesWithVotes.map(candidate => {
         const percentage = totalVotes ? (candidate.vote_count / totalVotes) * 100 : 0;
         
@@ -226,7 +217,6 @@ const Results: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -244,7 +234,6 @@ const Results: React.FC = () => {
             </Badge>
           </div>
 
-          {/* Enhanced Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardContent className="p-6">
@@ -308,7 +297,6 @@ const Results: React.FC = () => {
           </div>
         </div>
 
-        {/* Winner Announcement */}
         {winner && winner.vote_count > 0 && (
           <Card className="mb-8 border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-lg">
             <CardContent className="p-8">
@@ -330,7 +318,6 @@ const Results: React.FC = () => {
           </Card>
         )}
 
-        {/* No Votes Message */}
         {results.totalVotes === 0 && (
           <Card className="mb-8 border-2 border-gray-200 bg-gray-50 shadow-lg">
             <CardContent className="p-8 text-center">
@@ -350,7 +337,7 @@ const Results: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Results List */}
+
           <div className="lg:col-span-2">
             <Card className="bg-white border border-gray-200 shadow-lg">
               <CardHeader className="pb-4">
@@ -407,10 +394,8 @@ const Results: React.FC = () => {
               </CardContent>
             </Card>
           </div>
-
-          {/* Statistics & Actions */}
+              
           <div className="space-y-6">
-            {/* Participation Stats */}
             <Card className="bg-white border border-gray-200 shadow-lg">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl text-gray-800">Participation Statistics</CardTitle>

@@ -2,7 +2,7 @@ export interface PlatformStats {
   totalVotes: number;
   totalUsers: number;
   activeElections: number;
-  totalElections: number; // This represents completed elections
+  totalElections: number;
 }
 
 export const fetchPlatformStats = async (): Promise<PlatformStats> => {
@@ -17,7 +17,6 @@ export const fetchPlatformStats = async (): Promise<PlatformStats> => {
     return data;
   } catch (error) {
     console.error('Error fetching platform stats:', error);
-    // Return default values on error
     return {
       totalVotes: 0,
       totalUsers: 0,

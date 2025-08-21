@@ -20,28 +20,24 @@ export interface InvitationValidation {
   reason: string;
 }
 
-// Generate unique invitation token
 export const generateInvitationToken = async (): Promise<string> => {
   const { data, error } = await supabase.rpc('generate_invitation_token');
   if (error) throw error;
   return data;
 };
 
-// Upload CSV and create invitations
+
 export const uploadStudentCSV = async (file: File, organizationId: string): Promise<{ success: boolean; count: number }> => {
   try {
-    // Parse CSV file
     const csvText = await file.text();
     const lines = csvText.split('\n').filter(line => line.trim());
     const headers = lines[0].split(',').map(h => h.trim());
     
-    // Find email column
     const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));
     if (emailIndex === -1) {
       throw new Error('No email column found in CSV');
     }
     
-    // Process each line
     const invitations = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim());
@@ -59,14 +55,12 @@ export const uploadStudentCSV = async (file: File, organizationId: string): Prom
       }
     }
     
-    // Insert invitations
     const { error: insertError } = await supabase
       .from('student_invitations')
       .insert(invitations);
     
     if (insertError) throw insertError;
     
-    // Send invitation emails
     await sendInvitationEmails(invitations);
     
     return { success: true, count: invitations.length };
@@ -76,26 +70,20 @@ export const uploadStudentCSV = async (file: File, organizationId: string): Prom
   }
 };
 
-// Send invitation emails
 const sendInvitationEmails = async (invitations: any[]) => {
   for (const invitation of invitations) {
     const invitationLink = generateInvitationLink(invitation.invitation_token);
     
-    // Send email using your existing email service
     await sendInvitationEmail(invitation.email, invitationLink);
   }
 };
 
-// Generate invitation link
 export const generateInvitationLink = (token: string): string => {
-  // Use environment variable for production URL, fallback to current origin for development
   const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-  // Properly encode the token to handle + characters
   const encodedToken = encodeURIComponent(token);
   return `${baseUrl}/auth?invitation=${encodedToken}`;
 };
 
-// Send invitation email
 const sendInvitationEmail = async (email: string, invitationLink: string) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -119,7 +107,6 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
     </div>
   `;
 
-  // Send email using the server endpoint
   try {
     const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/send-invitation`, {
       method: 'POST',
@@ -139,14 +126,11 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
 
     return { success: true };
   } catch (error) {
-    // Log error securely without exposing sensitive data
     console.error('Failed to send invitation email - Network or server error');
-    // Don't fail the invitation creation if email fails
     return { success: true, warning: 'Invitation created but email could not be sent' };
   }
 };
 
-// Validate invitation token
 export const validateInvitationToken = async (token: string): Promise<InvitationValidation> => {
   try {
     const { data, error } = await supabase.rpc('validate_invitation_token', {
@@ -185,25 +169,21 @@ export const validateInvitationToken = async (token: string): Promise<Invitation
   }
 };
 
-// Register user with invitation
 export const registerWithInvitation = async (
   invitationToken: string,
   userData: { email: string; password: string; name: string }
 ): Promise<{ success: boolean; user?: any; error?: string }> => {
   try {
-    // Validate invitation token
     const validation = await validateInvitationToken(invitationToken);
     
     if (!validation.is_valid) {
       return { success: false, error: validation.reason };
     }
     
-    // Check if email matches invitation
     if (validation.email.toLowerCase() !== userData.email.toLowerCase()) {
       return { success: false, error: 'Email address does not match invitation' };
     }
     
-    // Check if user already exists
     const { data: existingUser } = await supabase
       .from('auth_users')
       .select('id')
@@ -214,14 +194,12 @@ export const registerWithInvitation = async (
       return { success: false, error: 'User already exists with this email' };
     }
     
-    // Hash password using SHA-256
     const encoder = new TextEncoder();
     const data = encoder.encode(userData.password);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
-    // Create user account
     const { data: user, error: userError } = await supabase
       .from('auth_users')
       .insert({
@@ -229,14 +207,13 @@ export const registerWithInvitation = async (
         password_hash: passwordHash,
         name: userData.name,
         role: 'student',
-        is_verified: true // Auto-verified since they have invitation
+        is_verified: true
       })
       .select()
       .single();
     
     if (userError) throw userError;
     
-    // Create user-organization relationship
     const { error: userOrgError } = await supabase
       .from('user_organizations')
       .insert({
@@ -249,7 +226,6 @@ export const registerWithInvitation = async (
     
     if (userOrgError) throw userOrgError;
     
-    // Mark invitation as used
     const { error: markError } = await supabase.rpc('mark_invitation_used', {
       p_invitation_id: validation.invitation_id,
       p_user_id: user.id
@@ -257,7 +233,6 @@ export const registerWithInvitation = async (
     
     if (markError) throw markError;
     
-    // Log invitation usage
     await logInvitationActivity(validation.invitation_id, 'registration_completed', {
       user_id: user.id,
       email: userData.email
@@ -270,7 +245,7 @@ export const registerWithInvitation = async (
   }
 };
 
-// Get invitation statistics
+
 export const getInvitationStats = async (organizationId: string) => {
   try {
     const { data, error } = await supabase.rpc('get_invitation_stats', {
@@ -296,7 +271,7 @@ export const getInvitationStats = async (organizationId: string) => {
   }
 };
 
-// Get all invitations for organization
+
 export const getOrganizationInvitations = async (organizationId: string) => {
   try {
     const { data, error } = await supabase
@@ -314,7 +289,7 @@ export const getOrganizationInvitations = async (organizationId: string) => {
   }
 };
 
-// Log invitation activity
+
 const logInvitationActivity = async (invitationId: string, action: string, details?: any) => {
   try {
     await supabase
@@ -329,7 +304,7 @@ const logInvitationActivity = async (invitationId: string, action: string, detai
   }
 };
 
-// Helper function to validate email
+
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);

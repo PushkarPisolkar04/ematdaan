@@ -8,14 +8,14 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdw
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Generate unique invitation token
+
 const generateInvitationToken = async (): Promise<string> => {
   const { data, error } = await supabase.rpc('generate_invitation_token');
   if (error) throw error;
   return data;
 };
 
-// Create invitations from CSV data
+
 router.post('/create-from-csv', async (req, res) => {
   try {
     const { emails, organizationId } = req.body;
@@ -28,7 +28,7 @@ router.post('/create-from-csv', async (req, res) => {
       return res.status(400).json({ error: 'Organization ID is required' });
     }
 
-    // Verify organization exists
+    
     const { data: organization, error: orgError } = await supabase
       .from('organizations')
       .select('id')
@@ -39,7 +39,7 @@ router.post('/create-from-csv', async (req, res) => {
       return res.status(404).json({ error: 'Organization not found' });
     }
 
-    // Create invitations for each email
+    
     const invitations: any[] = [];
     for (const email of emails) {
       if (email && isValidEmail(email)) {
@@ -58,7 +58,7 @@ router.post('/create-from-csv', async (req, res) => {
       return res.status(400).json({ error: 'No valid emails provided' });
     }
 
-    // Insert invitations
+    
     const { data: invitationData, error: insertError } = await supabase
       .from('student_invitations')
       .insert(invitations)
@@ -69,7 +69,7 @@ router.post('/create-from-csv', async (req, res) => {
       return res.status(500).json({ error: 'Failed to create invitations' });
     }
 
-    // Send invitation emails
+    
     await sendInvitationEmails(invitationData);
 
     res.json({ 
@@ -84,7 +84,7 @@ router.post('/create-from-csv', async (req, res) => {
   }
 });
 
-// Get invitations for organization
+
 router.get('/organization/:organizationId', async (req, res) => {
   try {
     const { organizationId } = req.params;
@@ -121,7 +121,7 @@ router.get('/validate/:token', async (req, res) => {
       return res.status(400).json({ error: 'Token is required' });
     }
 
-    // Direct query to student_invitations table
+    
     const { data, error } = await supabase
       .from('student_invitations')
       .select('*')
@@ -138,7 +138,7 @@ router.get('/validate/:token', async (req, res) => {
       });
     }
 
-    // Check if invitation is valid
+    
     const now = new Date();
     const expiresAt = new Date(data.expires_at);
     const isExpired = expiresAt < now;
@@ -173,7 +173,7 @@ router.get('/validate/:token', async (req, res) => {
 // Test endpoint to check table structure
 router.get('/test', async (req, res) => {
   try {
-    // Check if student_invitations table exists and has data
+    
     const { data, error } = await supabase
       .from('student_invitations')
       .select('*')
@@ -231,23 +231,23 @@ router.get('/stats/:organizationId', async (req, res) => {
   }
 });
 
-// Send invitation emails
+
 const sendInvitationEmails = async (invitations: any[]) => {
   for (const invitation of invitations) {
     const invitationLink = generateInvitationLink(invitation.invitation_token);
     
-    // Send email using your existing email service
+    
     await sendInvitationEmail(invitation.email, invitationLink);
   }
 };
 
-// Generate invitation link
+
 const generateInvitationLink = (token: string): string => {
   const baseUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
   return `${baseUrl}/auth?invitation=${token}`;
 };
 
-// Send invitation email
+
 const sendInvitationEmail = async (email: string, invitationLink: string) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -271,7 +271,7 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
     </div>
   `;
 
-  // Send email using the server endpoint
+  
   try {
     const response = await fetch(`${process.env.VITE_SERVER_URL || 'http://localhost:5000'}/send-invitation`, {
       method: 'POST',
@@ -296,13 +296,13 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
   }
 };
 
-// Helper function to validate email
+
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// Delete invitation (must be before /organization/:organizationId to avoid conflicts)
+
 router.delete('/delete/:invitationId', async (req, res) => {
   try {
     const { invitationId } = req.params;
@@ -311,7 +311,7 @@ router.delete('/delete/:invitationId', async (req, res) => {
       return res.status(400).json({ error: 'Invitation ID is required' });
     }
 
-    // Delete the invitation using service role (bypasses RLS)
+
     const { data, error } = await supabase
       .from('student_invitations')
       .delete()
@@ -337,7 +337,7 @@ router.delete('/delete/:invitationId', async (req, res) => {
   }
 });
 
-// Test route
+
 router.get('/test-delete', (req, res) => {
   res.json({ message: 'Delete route is working' });
 });

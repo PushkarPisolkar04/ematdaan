@@ -7,7 +7,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -22,7 +21,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Helper function to handle API responses
 const handleApiResponse = async <T>(promise: Promise<{ data: T; error: any }>) => {
   try {
     const response = await promise;
@@ -37,7 +35,6 @@ const handleApiResponse = async <T>(promise: Promise<{ data: T; error: any }>) =
   }
 };
 
-// Error handling function
 export const handleSupabaseError = (error: any) => {
   console.error('Supabase error:', error);
 
@@ -78,11 +75,9 @@ interface DatabaseElection {
   candidates: ElectionCandidate[];
 }
 
-// Election-related functions
 export const electionApi = {
   async setSchedule(electionData: { name: string; startTime: string; endTime: string; organizationId: string }) {
     try {
-      // Validate dates
       const startDate = new Date(electionData.startTime);
       const endDate = new Date(electionData.endTime);
       const now = new Date();
@@ -91,7 +86,6 @@ export const electionApi = {
         throw new Error('End time must be after start time');
       }
 
-      // Allow start times within the next 24 hours
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
       
@@ -99,7 +93,6 @@ export const electionApi = {
         throw new Error('Start time cannot be more than 24 hours in the past');
       }
 
-      // Get current user from localStorage to set context
       const userDataStr = localStorage.getItem('user_data');
       if (!userDataStr) {
         throw new Error('User session not found. Please log in again.');
@@ -110,11 +103,9 @@ export const electionApi = {
       console.log('Setting user context for user:', userData.id);
       console.log('Setting organization context for org:', electionData.organizationId);
       
-      // Check if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
       console.log('Current session:', session);
       
-      // Set user context for RLS policies
       const { error: userContextError } = await supabase.rpc('set_user_context', {
         p_user_id: userData.id
       });
@@ -123,7 +114,6 @@ export const electionApi = {
         console.error('Failed to set user context:', userContextError);
       }
 
-      // Set organization context for RLS policies
       const { error: orgContextError } = await supabase.rpc('set_organization_context', {
         p_organization_id: electionData.organizationId
       });
@@ -132,7 +122,6 @@ export const electionApi = {
         console.error('Failed to set organization context:', orgContextError);
       }
 
-      // Insert the election
       const { data: election, error: electionError } = await supabase
         .from('elections')
         .insert([{ 
@@ -159,18 +148,15 @@ export const electionApi = {
 
   async getSchedule(organizationId: string) {
     try {
-      // Get current user from localStorage to set context
       const userDataStr = localStorage.getItem('user_data');
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
         
-        // Set user context for RLS policies
         await supabase.rpc('set_user_context', {
           p_user_id: userData.id
         });
       }
 
-      // Set organization context for RLS policies
       await supabase.rpc('set_organization_context', {
         p_organization_id: organizationId
       });
@@ -203,23 +189,19 @@ export const electionApi = {
 
   async getActiveElections(organizationId: string) {
     try {
-      // If organizationId is empty, return empty array
       if (!organizationId || organizationId.trim() === '') {
         return [];
       }
 
-      // Get current user from localStorage to set context
       const userDataStr = localStorage.getItem('user_data');
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
         
-        // Set user context for RLS policies
         await supabase.rpc('set_user_context', {
           p_user_id: userData.id
         });
       }
 
-      // Set organization context for RLS policies
       await supabase.rpc('set_organization_context', {
         p_organization_id: organizationId
       });
@@ -262,18 +244,15 @@ export const electionApi = {
 
   async getPastElections(organizationId: string) {
     try {
-      // Get current user from localStorage to set context
       const userDataStr = localStorage.getItem('user_data');
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
         
-        // Set user context for RLS policies
         await supabase.rpc('set_user_context', {
           p_user_id: userData.id
         });
       }
 
-      // Set organization context for RLS policies
       await supabase.rpc('set_organization_context', {
         p_organization_id: organizationId
       });
@@ -298,15 +277,12 @@ export const electionApi = {
         return [];
       }
 
-      // For each election, fetch live stats
       const results = await Promise.all((elections as DatabaseElection[]).map(async (election) => {
-        // Live count of votes for this election
         const { count: totalVotes } = await supabase
           .from('votes')
           .select('id', { count: 'exact', head: true })
           .eq('election_id', election.id);
         
-        // For each candidate, count votes
         const candidates = await Promise.all((election.candidates || []).map(async (candidate: ElectionCandidate) => {
           const { count: candidateVotes } = await supabase
             .from('votes')
@@ -342,11 +318,9 @@ export const electionApi = {
   }
 };
 
-// Candidate-related functions
 export const candidateApi = {
   async add(candidate: { name: string; party: string; symbol: string; electionId: string }) {
     try {
-      // First verify the election exists and is active
       const { data: election, error: electionError } = await supabase
         .from('elections')
         .select('id')
@@ -437,8 +411,7 @@ export const candidateApi = {
     }
   }
 };
-
-// Voting functions
+  
 export const votingApi = {
   async castVote(voteData: { candidateId: string; electionId: string; userId: string }) {
     try {

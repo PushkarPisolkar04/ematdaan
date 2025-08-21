@@ -48,22 +48,18 @@ const Index = () => {
 
 
   useEffect(() => {
-    // Check if we should scroll to a specific section
     const scrollTo = searchParams.get('scrollTo');
     if (scrollTo === 'faqs') {
-      // Use a longer timeout to ensure the page and components are fully loaded
       setTimeout(() => {
         const faqsElement = document.getElementById('faqs');
         if (faqsElement) {
-          // Add a small offset to account for the fixed navbar
-          const navbarHeight = 80; // Height of the navbar
+          const navbarHeight = 80;
           const elementPosition = faqsElement.offsetTop - navbarHeight;
           window.scrollTo({
             top: elementPosition,
             behavior: 'smooth'
           });
         }
-        // Clean up the URL after scrolling
         setTimeout(() => {
           navigate('/', { replace: true });
         }, 500);
@@ -76,11 +72,9 @@ const Index = () => {
       try {
         setElectionsLoading(true);
         
-        // Only fetch elections if user is authenticated and has an organization
         if (isAuthenticated && organization?.id) {
           const data = await electionApi.getElections(organization.id);
           
-          // Filter for active elections only
           const now = new Date();
           const activeElectionsData = (data || []).filter(election => {
             const startTime = new Date(election.start_time);
@@ -118,7 +112,6 @@ const Index = () => {
     fetchElections();
     fetchStats();
 
-    // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated, organization]);
@@ -127,12 +120,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      {/* Background Pattern Overlay */}
       <div className="fixed inset-0 bg-gradient-to-br from-purple-100/20 via-blue-50/30 to-indigo-100/20 pointer-events-none"></div>
       <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM2QjIxRTgiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-40 pointer-events-none"></div>
       
       <main className="relative pt-20 w-full">
-        {/* Quick How to Vote Banner */}
         <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white py-4">
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
@@ -160,12 +151,10 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Hero Section */}
         <section className="relative overflow-hidden py-8 w-full">
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                {/* Left side - Content */}
                 <motion.div
                   initial={{ opacity: 0, x: -50 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -186,7 +175,6 @@ const Index = () => {
                     Secure, transparent, and user-friendly voting for any organizational decision.
                   </p>
 
-                  {/* CTA Buttons */}
                   <div className="flex flex-col sm:flex-row gap-4 mb-8">
                     <Button 
                       onClick={() => navigate('/auth')}
@@ -206,7 +194,7 @@ const Index = () => {
                     </Button>
                   </div>
 
-                  {/* Trust Indicators */}
+
                   <div className="flex items-center gap-6 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-green-600" />
@@ -228,7 +216,6 @@ const Index = () => {
                   className="relative"
                 >
                   <div className="relative">
-                    {/* Main Card */}
                     <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-2xl font-bold text-gray-900">Live Platform Stats</h3>
@@ -272,7 +259,6 @@ const Index = () => {
 
                     </div>
                     
-                    {/* Floating Elements */}
                     <div className="absolute -top-4 -right-4 bg-gradient-to-r from-[#6B21E8] to-purple-600 text-white p-3 rounded-xl shadow-lg">
                       <Zap className="h-6 w-6" />
                     </div>
@@ -287,10 +273,8 @@ const Index = () => {
           </div>
         </section>
 
-                            {/* Features Section */}
           <FeatureSection />
 
-        {/* Live Elections Section */}
         {isAuthenticated && organization && activeElections.length > 0 && (
           <section className="py-16 w-full bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-indigo-600/10 backdrop-blur-sm">
             <div className="w-full px-4 sm:px-6 lg:px-8">
@@ -382,7 +366,6 @@ const Index = () => {
           </section>
         )}
 
-        {/* Live Elections Section for non-authenticated users */}
         {!isAuthenticated && activeElections.length > 0 && (
           <section className="py-16 w-full bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-indigo-600/10 backdrop-blur-sm">
             <div className="w-full px-4 sm:px-6 lg:px-8">
@@ -455,13 +438,10 @@ const Index = () => {
           </section>
         )}
 
-        {/* Stats Section */}
         <StatsSection />
 
-        {/* How It Works */}
         <HowItWorks />
 
-        {/* FAQ Section */}
         <FAQSection />
       </main>
 
@@ -470,8 +450,7 @@ const Index = () => {
     </div>
   );
 };
-
-// Helper function to calculate election progress
+  
 const getElectionProgress = (startTime: string, endTime: string): number => {
   const startMs = new Date(startTime).valueOf();
   const endMs = new Date(endTime).valueOf();

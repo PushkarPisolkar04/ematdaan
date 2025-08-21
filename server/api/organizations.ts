@@ -4,12 +4,12 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables from the project root
+
 dotenv.config({ path: '.env' });
 
 const router = express.Router();
 
-// Initialize Supabase client with service role key
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -21,12 +21,12 @@ if (!serviceRoleKey) {
 
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
 
-// Create organization endpoint
+
 router.post('/create', async (req, res) => {
   try {
     const { name, ownerName, ownerEmail, ownerPassword } = req.body;
 
-    // Validate input
+  
     if (!name || !ownerName || !ownerEmail || !ownerPassword) {
       return res.status(400).json({
         success: false,
@@ -34,14 +34,14 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Generate slug
+  
     const slug = name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    // Check if organization exists
+  
     const { data: existingOrg } = await supabase
       .from('organizations')
       .select('id')
@@ -55,7 +55,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Check if owner email exists
+ 
     const { data: existingUser } = await supabase
       .from('auth_users')
       .select('id')
@@ -69,10 +69,10 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Hash admin password
+
     const adminPasswordHash = crypto.createHash('sha256').update(ownerPassword).digest('hex');
 
-    // Create organization
+  
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
       .insert({
@@ -93,7 +93,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Create admin user
+
     const { data: userData, error: userError } = await supabase
       .from('auth_users')
       .insert({
@@ -114,7 +114,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Create user-organization relationship
+   
     const { error: userOrgError } = await supabase
       .from('user_organizations')
       .insert({
@@ -133,7 +133,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    // Create session
+
     const { data: sessionData, error: sessionError } = await supabase.rpc('create_user_session', {
       p_user_id: userData.id,
       p_organization_id: orgData.id,
@@ -168,12 +168,13 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// Send OTP endpoint
+
+
 router.post('/send-otp', async (req, res) => {
   try {
     const { email, name, ownerName, ownerPassword } = req.body;
 
-    // Validate input
+   
     if (!email || !name || !ownerName || !ownerPassword) {
       return res.status(400).json({
         success: false,
@@ -181,17 +182,17 @@ router.post('/send-otp', async (req, res) => {
       });
     }
 
-    // Clean up old OTPs for this email
+  
     await supabase
       .from('otps')
       .delete()
       .eq('email', email);
 
-    // Generate OTP
+  
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Store OTP in database
+ 
     const { error: otpError } = await supabase
       .from('otps')
       .insert({
@@ -208,7 +209,7 @@ router.post('/send-otp', async (req, res) => {
       });
     }
 
-    // Send OTP via email (using your existing email service)
+    
           const emailResponse = await fetch(`${process.env.VITE_APP_URL || 'http://localhost:3000'}/api/send-otp`, {
       method: 'POST',
       headers: {
@@ -241,12 +242,12 @@ router.post('/send-otp', async (req, res) => {
   }
 });
 
-// Verify OTP and create organization
+
 router.post('/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // Validate input
+   
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
@@ -254,7 +255,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Verify OTP
+    
     const { data: otpData, error: otpError } = await supabase
       .from('otps')
       .select('*')
@@ -270,7 +271,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Check if OTP is expired
+   
     if (new Date(otpData.expires_at) < new Date()) {
       return res.status(400).json({
         success: false,
@@ -278,14 +279,11 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Mark OTP as verified
     await supabase
       .from('otps')
       .update({ is_verified: true })
       .eq('id', otpData.id);
-
-    // For now, we'll need to get the organization data from the request body
-    // This is a temporary fix until we add the details column to the database
+  
     const { name, ownerName, ownerPassword } = req.body;
     
     if (!name || !ownerName || !ownerPassword) {
@@ -302,17 +300,17 @@ router.post('/verify-otp', async (req, res) => {
       ownerPassword
     };
 
-    // Generate slug
+   
     const slug = orgDetails.name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    // Hash admin password
+  
     const adminPasswordHash = crypto.createHash('sha256').update(orgDetails.ownerPassword).digest('hex');
 
-    // Create organization
+  
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
       .insert({
@@ -333,7 +331,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Create admin user
+
     const { data: userData, error: userError } = await supabase
       .from('auth_users')
       .insert({
@@ -354,7 +352,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Create user-organization relationship
+ 
     const { error: userOrgError } = await supabase
       .from('user_organizations')
       .insert({
@@ -373,7 +371,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Create session
+
     const { data: sessionData, error: sessionError } = await supabase.rpc('create_user_session', {
       p_user_id: userData.id,
       p_organization_id: orgData.id,

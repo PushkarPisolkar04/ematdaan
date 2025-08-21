@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
 
-  // Check for existing session on mount
+
   useEffect(() => {
     checkSession();
   }, []);
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // Check for session token in localStorage
+
       const sessionToken = localStorage.getItem('session_token');
       
       if (!sessionToken) {
@@ -94,13 +94,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      // Validate session with database
+
       const { data, error } = await supabase.rpc('validate_session', {
         p_session_token: sessionToken
       });
 
       if (error || !data || data.length === 0 || !data[0].is_valid) {
-        // Invalid session, clear storage
+
         localStorage.removeItem('session_token');
         localStorage.removeItem('user_data');
         localStorage.removeItem('organization_data');
@@ -110,17 +110,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const sessionData = data[0];
       
-      // Set user context for RLS policies
+
       await supabase.rpc('set_user_context', {
         p_user_id: sessionData.user_id
       });
 
-      // Set organization context for RLS policies
+
       await supabase.rpc('set_organization_context', {
         p_organization_id: sessionData.organization_id
       });
       
-      // Get user details
+
       const { data: userData, error: userError } = await supabase
         .from('auth_users')
         .select('*')
@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User not found');
       }
 
-      // Get organization details
+
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('*')
@@ -142,20 +142,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Organization not found');
       }
 
-      // Update state
+
       setUser(userData);
       setOrganization(orgData);
       setUserRole(sessionData.role);
       setIsAuthenticated(true);
 
-      // Store in localStorage for persistence
+
       localStorage.setItem('user_data', JSON.stringify(userData));
       localStorage.setItem('organization_data', JSON.stringify(orgData));
       localStorage.setItem('user_role', sessionData.role);
 
     } catch (error) {
       console.error('Session check failed:', error);
-      // Clear invalid session data
+
       localStorage.removeItem('session_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('organization_data');
@@ -169,7 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // First, find the user
+
       const { data: userData, error: userError } = await supabase
         .from('auth_users')
         .select('*')
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User not found. Please check your email or register.');
       }
 
-      // Verify password (hash the input password and compare)
+
       const encoder = new TextEncoder();
       const data = encoder.encode(password);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Invalid password');
       }
 
-      // Get user's organization
+
       const { data: userOrgData, error: userOrgError } = await supabase
         .from('user_organizations')
         .select(`
@@ -206,7 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User is not associated with any organization');
       }
 
-      // Create session
+
       const { data: sessionData, error: sessionError } = await supabase.rpc('create_user_session', {
         p_user_id: userData.id,
         p_organization_id: userOrgData.organization_id,
@@ -218,26 +218,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Failed to create session');
       }
 
-      // Set user context for RLS policies
+
       await supabase.rpc('set_user_context', {
         p_user_id: userData.id
       });
 
-      // Set organization context for RLS policies
+
       await supabase.rpc('set_organization_context', {
         p_organization_id: userOrgData.organization_id
       });
 
-      // Store session token
+
       localStorage.setItem('session_token', sessionData);
 
-      // Update state
+
       setUser(userData);
       setOrganization(userOrgData.organization);
       setUserRole(userOrgData.role);
       setIsAuthenticated(true);
 
-      // Store in localStorage
+
       localStorage.setItem('user_data', JSON.stringify(userData));
       localStorage.setItem('organization_data', JSON.stringify(userOrgData.organization));
       localStorage.setItem('user_role', userOrgData.role);
@@ -265,19 +265,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const sessionToken = localStorage.getItem('session_token');
       
       if (sessionToken) {
-        // Invalidate session in database
+
         await supabase.rpc('invalidate_session', {
           p_session_token: sessionToken
         });
       }
 
-      // Clear all storage
+
       localStorage.removeItem('session_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('organization_data');
       localStorage.removeItem('user_role');
 
-      // Reset state
+
       setUser(null);
       setOrganization(null);
       setUserRole('');
@@ -290,7 +290,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     } catch (error) {
       console.error('Logout failed:', error);
-      // Still clear local storage even if server call fails
+
       localStorage.removeItem('session_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('organization_data');
@@ -314,7 +314,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Send OTP via backend API
+
       const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/organizations/send-otp`, {
         method: 'POST',
         headers: {
@@ -333,7 +333,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(errorData.message || 'Failed to send OTP');
       }
 
-      // Store organization data temporarily for OTP verification
+
       localStorage.setItem('pending_org_data', JSON.stringify({
         name: data.name,
         ownerName: data.ownerName,
@@ -345,7 +345,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         description: `Verification code sent to ${data.ownerEmail}. Please check your email.`
       });
 
-      // Return success but don't create organization yet
+
       return { success: true, requiresOTP: true };
 
     } catch (error) {
@@ -365,7 +365,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Get the pending organization data from localStorage
+
       const pendingOrgData = localStorage.getItem('pending_org_data');
       if (!pendingOrgData) {
         throw new Error('No pending organization data found');
@@ -373,7 +373,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       const orgData = JSON.parse(pendingOrgData);
 
-      // Verify OTP and create organization via backend API
+
       const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/organizations/verify-otp`, {
         method: 'POST',
         headers: {
@@ -396,21 +396,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const result = await response.json();
 
       if (result.success) {
-        // Store session token
+
         localStorage.setItem('session_token', result.data.sessionToken);
 
-        // Update state to log the user in
+
         setUser(result.data.user);
         setOrganization(result.data.organization);
         setUserRole('admin');
         setIsAuthenticated(true);
 
-        // Store in localStorage
+
         localStorage.setItem('user_data', JSON.stringify(result.data.user));
         localStorage.setItem('organization_data', JSON.stringify(result.data.organization));
         localStorage.setItem('user_role', 'admin');
         
-        // Clean up pending organization data
+
         localStorage.removeItem('pending_org_data');
 
         toast({
@@ -444,7 +444,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Use backend API for registration
+
       const result = await authApi.registerWithInvitation({
         token,
         name: data.name,
@@ -475,10 +475,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const sendOTP = async (email: string) => {
     try {
-      // Generate secure OTP
+
       const otp = generateSecureOTP();
       
-      // Send OTP via email using server endpoint
+
       const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/send-otp`, {
         method: 'POST',
         headers: {
@@ -491,7 +491,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Failed to send OTP');
       }
 
-      // Store OTP temporarily (in production, this should be server-side)
+
       sessionStorage.setItem('pending_otp', JSON.stringify({ email, otp, timestamp: Date.now() }));
 
       toast({
@@ -514,7 +514,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
     try {
-      // Validate OTP format
+
       if (!isValidOTPFormat(otp)) {
         toast({
           title: "Invalid OTP",
@@ -524,7 +524,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
 
-      // Get stored OTP
+
       const storedOTPData = sessionStorage.getItem('pending_otp');
       if (!storedOTPData) {
         toast({
@@ -537,7 +537,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const { email: storedEmail, otp: storedOTP, timestamp } = JSON.parse(storedOTPData);
       
-      // Check if email matches and OTP is not expired (5 minutes)
+
       if (email !== storedEmail || Date.now() - timestamp > 5 * 60 * 1000) {
         sessionStorage.removeItem('pending_otp');
         toast({
@@ -548,7 +548,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
 
-      // Verify OTP
+
       if (otp !== storedOTP) {
         toast({
           title: "Invalid OTP",
@@ -558,7 +558,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
 
-      // Clear stored OTP
+        
       sessionStorage.removeItem('pending_otp');
 
       toast({

@@ -66,7 +66,6 @@ const Dashboard = () => {
       return;
     }
     
-    // Redirect admins to admin panel
     if (userRole === 'admin') {
       navigate('/admin');
       return;
@@ -75,14 +74,12 @@ const Dashboard = () => {
     loadDashboardData();
   }, [isAuthenticated, user, organization, userRole]);
 
-  // Recalculate stats when elections or platform stats change
   useEffect(() => {
     if (elections.length > 0 || platformStats) {
       loadStats();
     }
   }, [elections, platformStats]);
 
-  // Refresh data when component comes into focus (e.g., after voting)
   useEffect(() => {
     const handleFocus = () => {
       if (isAuthenticated && organization && user) {
@@ -121,19 +118,15 @@ const Dashboard = () => {
       setPlatformStats(stats);
     } catch (error) {
       console.error('Failed to load platform stats:', error);
-      // Don't throw error, continue with local stats
     }
   };
 
   const loadElections = async () => {
     try {
-      // Use the same API as admin dashboard
       const electionsData = await electionApi.getElections(organization?.id);
       
-      // Check which elections the user has voted in using server API
       const votedElectionIds = new Set();
       
-      // Check voting status for each election
       for (const election of electionsData || []) {
         try {
           const hasVoted = await votingApi.hasVoted(user.id, election.id);
@@ -151,7 +144,7 @@ const Dashboard = () => {
         start_time: election.start_time,
         end_time: election.end_time,
         is_active: election.is_active,
-        total_votes: 0, // Will be calculated separately if needed
+        total_votes: 0,
         candidates_count: election.candidates?.length || 0,
         has_voted: votedElectionIds.has(election.id)
       }));
@@ -167,7 +160,6 @@ const Dashboard = () => {
     try {
       const now = new Date();
       
-      // Calculate stats from the elections data
       const totalElections = elections.length;
       const participatedElections = elections.filter(e => e.has_voted).length;
       const activeElections = elections.filter(e => {
@@ -207,24 +199,20 @@ const Dashboard = () => {
     const startTime = new Date(election.start_time);
     const endTime = new Date(election.end_time);
 
-    // Get current time in IST
     const nowIST = new Date();
     const startTimeIST = new Date(election.start_time);
     const endTimeIST = new Date(election.end_time);
 
-    // If current time is before start time, it's upcoming
     if (nowIST < startTimeIST) {
       return { status: 'upcoming', label: 'Upcoming', color: 'bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200' };
     } 
-    // If current time is after end time, it's ended
     else if (nowIST > endTimeIST) {
       return { status: 'ended', label: 'Ended', color: 'bg-gray-600 text-white hover:bg-gray-700 transition-colors duration-200' };
     }
-    // If current time is between start and end, check if it's active
     else if (election.is_active) {
       return { status: 'active', label: 'Active', color: 'bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-200' };
     }
-    // Otherwise it's inactive
+
     else {
       return { status: 'inactive', label: 'Inactive', color: 'bg-red-600 text-white hover:bg-red-700 transition-colors duration-200' };
     }
@@ -242,7 +230,6 @@ const Dashboard = () => {
     });
   };
 
-  // Separate elections by status
   const activeElections = elections.filter(election => {
     const status = getElectionStatus(election);
     return status.status === 'active';
@@ -272,7 +259,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -295,7 +281,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Enhanced Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
@@ -358,9 +343,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Elections Section */}
         <div className="space-y-6">
-          {/* Active Elections Section */}
           {activeElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -468,7 +451,6 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Upcoming Elections Section */}
           {upcomingElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -534,7 +516,6 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Completed Elections Section */}
           {completedElections.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
@@ -610,8 +591,7 @@ const Dashboard = () => {
               </div>
             </div>
           )}
-
-          {/* No Elections Message */}
+    
           {elections.length === 0 && (
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardContent className="p-8 text-center">
