@@ -1,7 +1,7 @@
 {
   "name": "ematdaan-server",
   "version": "1.0.0",
-  "description": "Backend API for E-Matdaan voting system",
+  "description": "Backend API for E-Matdaan organizational voting system",
   "main": "index.ts",
   "scripts": {
     "start": "node dist/index.js",

@@ -5,37 +5,36 @@ import { Card, CardContent } from "@/components/ui/card";
 const features = [
   {
     icon: Shield,
-    title: "Multi-Factor Authentication",
-    description: "Secure login with email and OTP verification.",
+    title: "Enterprise Security",
+    description: "Bank-level security with multi-factor authentication and OTP verification.",
     color: "from-purple-500 to-purple-600",
     bgColor: "from-purple-50 to-purple-100",
   },
   {
     icon: Lock,
     title: "End-to-End Encryption",
-    description: "AES-256 encryption protects every vote from tampering.",
+    description: "AES-256 encryption protects every vote from tampering and ensures privacy.",
     color: "from-blue-500 to-blue-600",
     bgColor: "from-blue-50 to-blue-100",
   },
-
   {
     icon: Eye,
     title: "Complete Transparency",
-    description: "Public verification without compromising voter privacy.",
+    description: "Public verification without compromising voter privacy or anonymity.",
     color: "from-orange-500 to-orange-600",
     bgColor: "from-orange-50 to-orange-100",
   },
   {
     icon: Users,
-    title: "Multi-Tenant Platform",
-    description: "Secure isolated environments for different organizations.",
+    title: "Multi-Organization Support",
+    description: "Secure isolated environments for schools, colleges, corporate offices, and NGOs.",
     color: "from-indigo-500 to-indigo-600",
     bgColor: "from-indigo-50 to-indigo-100",
   },
   {
     icon: Zap,
     title: "Real-Time Results",
-    description: "Instant vote counting with live result updates.",
+    description: "Instant vote counting with live result updates and detailed analytics.",
     color: "from-pink-500 to-pink-600",
     bgColor: "from-pink-50 to-pink-100",
   },
@@ -54,11 +53,11 @@ const FeatureSection = () => {
             className="text-left mb-12"
         >
             <h2 className="text-4xl font-bold mb-4 text-gray-900">
-              Why Choose E-Matdaan?
+              Why Choose E-Matdaan for Your Organization?
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl">
               Built with cutting-edge technology to ensure the highest levels of security, 
-              transparency, and accessibility for modern democratic processes.
+              transparency, and accessibility for organizational voting and decision-making.
           </p>
         </motion.div>
 

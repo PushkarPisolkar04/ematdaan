@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const FAQSection = () => {
   const faqs = [
     {
+      question: "What types of organizations can use E-Matdaan?",
+      answer: "E-Matdaan is perfect for schools, colleges, universities, corporate offices, residential societies, NGOs, non-profits, and any organization that needs secure voting. Whether you're electing student council members, employee representatives, or community leaders, our platform handles it all."
+    },
+    {
       question: "How secure is the voting system?",
       answer: "E-Matdaan uses military-grade AES-256 encryption and digital signatures to protect your vote. Each vote is encrypted before storage and can only be decrypted with proper authorization. Our system ensures vote integrity and prevents tampering."
     },
@@ -19,7 +23,6 @@ const FAQSection = () => {
       question: "Can I vote multiple times in the same election?",
       answer: "No, the system prevents double voting through sophisticated database checks and unique voter identification. Each user can only vote once per election, and this is enforced at both the application and database levels."
     },
-
     {
       question: "What if I forget my password?",
       answer: "Please contact your organization administrator to reset your password. They have the ability to help you regain access to your account."

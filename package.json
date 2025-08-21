@@ -2,6 +2,7 @@
   "name": "ematdaan",
   "private": true,
   "version": "0.1.0",
+  "description": "Secure digital voting platform for organizational elections and decision-making",
   "type": "module",
   "scripts": {
     "dev": "vite",

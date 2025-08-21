@@ -174,16 +174,16 @@ const Index = () => {
                 >
                   <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
                     <span className="bg-gradient-to-r from-gray-900 via-purple-800 to-[#6B21E8] bg-clip-text text-transparent">
-                      The Future of
+                      Professional
                     </span>
                     <br />
-                    <span className="text-gray-900">Secure Digital Voting</span>
+                    <span className="text-gray-900">Organizational Voting</span>
                   </h1>
 
                   <p className="text-xl text-gray-700 mb-8 leading-relaxed max-w-2xl">
-                    Experience the most advanced voting platform with enterprise-grade security 
-                    and digital signatures. Your vote is protected by cutting-edge cryptography 
-                    and transparent verification systems.
+                    The most advanced digital voting platform designed specifically for organizations. 
+                    Perfect for schools, colleges, corporate offices, residential societies, and NGOs. 
+                    Secure, transparent, and user-friendly voting for any organizational decision.
                   </p>
 
                   {/* CTA Buttons */}
