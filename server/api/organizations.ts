@@ -210,7 +210,7 @@ router.post('/send-otp', async (req, res) => {
     }
 
     
-          const emailResponse = await fetch(`${process.env.VITE_APP_URL || 'http://localhost:3000'}/api/send-otp`, {
+          const emailResponse = await fetch(`${process.env.VITE_SERVER_URL || 'http://localhost:3000'}/api/send-otp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
