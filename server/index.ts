@@ -186,6 +186,52 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// SendGrid test endpoint
+app.get('/api/test-sendgrid', async (req, res) => {
+  try {
+    const msg = {
+      to: 'test@example.com',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
+      subject: 'SendGrid Test',
+      text: 'This is a test email',
+    };
+
+    // This will fail but show us the exact error
+    await sgMail.send(msg);
+    res.json({ success: true, message: 'SendGrid is working' });
+  } catch (error: any) {
+    res.json({ 
+      success: false, 
+      error: error.message,
+      code: error.code,
+      statusCode: error.response?.status
+    });
+  }
+});
+
+// SendGrid test endpoint
+app.get('/api/test-sendgrid', async (req, res) => {
+  try {
+    const msg = {
+      to: 'test@example.com',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
+      subject: 'SendGrid Test',
+      text: 'This is a test email',
+    };
+
+    // This will fail but show us the exact error
+    await sgMail.send(msg);
+    res.json({ success: true, message: 'SendGrid is working' });
+  } catch (error: any) {
+    res.json({ 
+      success: false, 
+      error: error.message,
+      code: error.code,
+      statusCode: error.response?.status
+    });
+  }
+});
+
 const PORT = process.env.SERVER_PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
