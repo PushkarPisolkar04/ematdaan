@@ -1,9 +1,13 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import sgMail from '@sendgrid/mail';
 
 dotenv.config({ path: '.env' });
 const router = express.Router();
+
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, serviceRoleKey || 'invalid_key_will_cause_error');
@@ -271,24 +275,16 @@ const sendInvitationEmail = async (email: string, invitationLink: string) => {
     </div>
   `;
 
-  
+  // Send invitation email using SendGrid directly
   try {
-    const response = await fetch(`${process.env.VITE_SERVER_URL || 'http://localhost:5000'}/send-invitation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: email,
-        subject: 'You are invited to vote in the election',
-        html
-      }),
-    });
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
+      subject: 'You are invited to vote in the election',
+      html
+    };
 
-    if (!response.ok) {
-      throw new Error('Failed to send email');
-    }
-
+    await sgMail.send(msg);
     return { success: true };
   } catch (error) {
     console.error('Failed to send invitation email:', error);

@@ -3,11 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
+import sgMail from '@sendgrid/mail';
 
 
 dotenv.config({ path: '.env' });
 
 const router = express.Router();
+
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xpcemfyksgaxthzzdwiv.supabase.co';
@@ -209,19 +213,28 @@ router.post('/send-otp', async (req, res) => {
       });
     }
 
-    
-          const emailResponse = await fetch(`${process.env.VITE_SERVER_URL || 'http://localhost:3000'}/api/send-otp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email,
-        otp: otp
-      })
-    });
+    // Send OTP email using SendGrid
+    try {
+      const msg = {
+        to: email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
+        subject: 'Your E-Matdaan OTP',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">E-Matdaan Verification Code</h2>
+            <p>Your verification code is:</p>
+            <div style="background-color: #f3f4f6; padding: 20px; text-align: center; font-size: 24px; letter-spacing: 4px; font-weight: bold;">
+              ${otp}
+            </div>
+            <p style="color: #6b7280; margin-top: 20px;">This code will expire in 5 minutes.</p>
+            <p style="color: #6b7280;">If you didn't request this code, please ignore this email.</p>
+          </div>
+        `,
+      };
 
-    if (!emailResponse.ok) {
+      await sgMail.send(msg);
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError);
       return res.status(500).json({
         success: false,
         message: 'Failed to send OTP email'
