@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import organizationsRouter from './api/organizations';
@@ -49,23 +49,15 @@ const isValidEmail = (email: string): boolean => {
   return emailRegex.test(email) && email.length <= 254;
 };
 
-const transporter = nodemailer.createTransport({
-  host: process.env.VITE_SMTP_HOST,
-  port: parseInt(process.env.VITE_SMTP_PORT || '587'),
-  secure: false, 
-  auth: {
-    user: process.env.VITE_SMTP_USER,
-    pass: process.env.VITE_SMTP_PASS,
-  },
-});
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('SMTP configuration error:', error);
-  } else {
-    console.log('SMTP server is ready to send emails');
-  }
-});
+// Test SendGrid configuration on startup
+if (process.env.SENDGRID_API_KEY) {
+  console.log('SendGrid is ready to send emails');
+} else {
+  console.error('SendGrid API key not configured');
+}
 
 app.post('/api/send-otp', emailRateLimit, async (req, res) => {
   try {
@@ -92,9 +84,9 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
       });
     }
 
-    await transporter.sendMail({
-      from: process.env.VITE_SMTP_FROM,
+    const msg = {
       to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
       subject: 'Your E-Matdaan OTP',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -107,7 +99,9 @@ app.post('/api/send-otp', emailRateLimit, async (req, res) => {
           <p style="color: #6b7280;">If you didn't request this code, please ignore this email.</p>
         </div>
       `,
-    });
+    };
+
+    await sgMail.send(msg);
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
@@ -152,12 +146,14 @@ app.post('/send-invitation', emailRateLimit, async (req, res) => {
       });
     }
 
-    await transporter.sendMail({
-      from: process.env.VITE_SMTP_FROM,
+    const msg = {
       to: to,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
       subject: subject,
       html: html,
-    });
+    };
+
+    await sgMail.send(msg);
 
     res.json({
       success: true,
