@@ -15,6 +15,11 @@ dotenv.config({ path: '.env' });
 
 const app = express();
 
+// Configure trust proxy for deployment platforms like Render, Heroku, etc.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true);
+}
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://ematdaan.vercel.app'] 
