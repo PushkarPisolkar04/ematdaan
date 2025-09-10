@@ -71,7 +71,7 @@ npm run dev:all
 - **🔐 Enterprise Security**: End-to-end encryption, digital signatures, row-level security
 - **🏢 Multi-Organization Support**: Multi-tenant architecture, secure invitation system, role-based access
 - **🗳️ Professional Voting System**: Real-time elections, vote verification, audit logging, PDF reports
-- **📧 Email Integration**: OTP verification, invitation emails, SMTP support
+- **📧 Email Integration**: OTP verification, invitation emails, SendGrid integration
 - **📊 Analytics Dashboard**: Real-time statistics, vote tracking, user analytics
 - **📱 Mobile Responsive**: Works seamlessly on all devices
 - **🌐 Multi-Language Ready**: Easy to adapt for different regions and languages
@@ -83,7 +83,7 @@ npm run dev:all
 - **Frontend**: React 18 + TypeScript + Vite + TailwindCSS
 - **Backend**: Node.js + Express.js + TypeScript
 - **Database**: Supabase (PostgreSQL)
-- **Email**: Nodemailer + SMTP
+- **Email**: SendGrid API
 - **Deployment**: Vercel (Frontend) + Render (Backend)
 
 ---
@@ -101,12 +101,9 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 SERVER_PORT=5000
 NODE_ENV=development
 
-# Email Configuration (SMTP)
-VITE_SMTP_HOST=smtp.gmail.com
-VITE_SMTP_PORT=587
-VITE_SMTP_USER=your_email@gmail.com
-VITE_SMTP_PASS=your_app_password
-VITE_SMTP_FROM=your_email@gmail.com
+# Email Configuration (SendGrid)
+SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_FROM_EMAIL=your-verified-email@yourdomain.com
 
 # Application URLs
 VITE_APP_URL=http://localhost:3000
@@ -117,6 +114,12 @@ VITE_SERVER_URL=http://localhost:5000
 1. Create a Supabase project at [supabase.com](https://supabase.com)
 2. Run the migration: `supabase/migrations/20250101000000_complete_system_reset.sql`
 3. Copy your Supabase URL and keys to the environment variables
+
+### **3. Email Setup (SendGrid)**
+1. Create a free SendGrid account at [sendgrid.com](https://sendgrid.com)
+2. Go to Settings → API Keys → Create API Key (with Mail Send permissions)
+3. Go to Settings → Sender Authentication → Verify your email address
+4. Add `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` to environment variables
 
 ---
 
@@ -137,7 +140,7 @@ VITE_SERVER_URL=http://localhost:5000
 4. Add environment variables in Render dashboard:
    - `VITE_SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - `VITE_SMTP_HOST`, `VITE_SMTP_PORT`, `VITE_SMTP_USER`, `VITE_SMTP_PASS`, `VITE_SMTP_FROM`
+   - `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
    - `VITE_APP_URL`, `VITE_SERVER_URL`
    - `NODE_ENV=production`
 
