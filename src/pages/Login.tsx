@@ -58,11 +58,34 @@ const Login = () => {
     const token = searchParams.get('invitation');
     const tab = searchParams.get('tab');
     
+    console.log('URL search params:', window.location.search);
+    console.log('Extracted invitation token:', token);
+    
     if (token) {
-      const decodedToken = decodeURIComponent(token).replace(/ /g, '+');
-      setInvitationToken(decodedToken);
-      setActiveTab('join');
-      validateInvitation(decodedToken);
+      try {
+        // Handle multiple URL encoding scenarios
+        let decodedToken = token;
+        try {
+          decodedToken = decodeURIComponent(token);
+        } catch (e) {
+          console.warn('Failed to decode URI component, using raw token');
+        }
+        
+        // Replace spaces with + (common URL encoding issue)
+        decodedToken = decodedToken.replace(/ /g, '+');
+        
+        console.log('Final decoded token:', decodedToken);
+        setInvitationToken(decodedToken);
+        setActiveTab('join');
+        validateInvitation(decodedToken);
+      } catch (error) {
+        console.error('Error processing invitation token:', error);
+        toast({
+          title: "Invalid Invitation",
+          description: "The invitation link appears to be malformed. Please contact your administrator.",
+          variant: "destructive"
+        });
+      }
     } else if (tab) {
       setActiveTab(tab);
     }
