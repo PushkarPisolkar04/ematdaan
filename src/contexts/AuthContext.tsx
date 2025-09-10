@@ -315,7 +315,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
 
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/organizations/send-otp`, {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'}/api/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
