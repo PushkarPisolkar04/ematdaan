@@ -258,17 +258,17 @@ router.post('/send-otp', async (req, res) => {
 
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, name, ownerName, ownerPassword } = req.body;
 
-   
-    if (!email || !otp) {
+    // Validate required fields
+    if (!email || !otp || !name || !ownerName || !ownerPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Email and OTP are required'
+        message: 'All fields are required (email, otp, name, ownerName, ownerPassword)'
       });
     }
 
-    
+    // Verify OTP
     const { data: otpData, error: otpError } = await supabase
       .from('otps')
       .select('*')
@@ -284,7 +284,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-   
+    // Check if OTP has expired
     if (new Date(otpData.expires_at) < new Date()) {
       return res.status(400).json({
         success: false,
@@ -292,44 +292,57 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
+    // Mark OTP as verified
     await supabase
       .from('otps')
       .update({ is_verified: true })
       .eq('id', otpData.id);
-  
-    const { name, ownerName, ownerPassword } = req.body;
-    
-    if (!name || !ownerName || !ownerPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Organization data is required'
-      });
-    }
-    
-    const orgDetails = {
-      name,
-      ownerName,
-      ownerEmail: email,
-      ownerPassword
-    };
 
-   
-    const slug = orgDetails.name
+    // Generate slug for organization
+    const slug = name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-  
-    const adminPasswordHash = crypto.createHash('sha256').update(orgDetails.ownerPassword).digest('hex');
+    // Hash the password
+    const adminPasswordHash = crypto.createHash('sha256').update(ownerPassword).digest('hex');
 
-  
+    // Check if organization name or email already exists
+    const { data: existingOrg } = await supabase
+      .from('organizations')
+      .select('id, name, admin_email')
+      .or(`name.eq.${name},admin_email.eq.${email},slug.eq.${slug}`)
+      .single();
+
+    if (existingOrg) {
+      return res.status(409).json({
+        success: false,
+        message: 'Organization name or admin email already exists'
+      });
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('auth_users')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Create organization
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
       .insert({
-        name: orgDetails.name,
+        name: name,
         slug: slug,
-        admin_email: orgDetails.ownerEmail,
+        admin_email: email,
         admin_password_hash: adminPasswordHash,
         is_active: true
       })
@@ -340,17 +353,17 @@ router.post('/verify-otp', async (req, res) => {
       console.error('Organization creation error:', orgError);
       return res.status(500).json({
         success: false,
-        message: 'Failed to create organization'
+        message: 'Failed to create organization: ' + orgError.message
       });
     }
 
-
+    // Create admin user
     const { data: userData, error: userError } = await supabase
       .from('auth_users')
       .insert({
-        email: orgDetails.ownerEmail,
+        email: email,
         password_hash: adminPasswordHash,
-        name: orgDetails.ownerName,
+        name: ownerName,
         role: 'admin',
         is_verified: true
       })
@@ -359,13 +372,19 @@ router.post('/verify-otp', async (req, res) => {
 
     if (userError) {
       console.error('User creation error:', userError);
+      // If user creation fails, clean up the organization
+      await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', orgData.id);
+      
       return res.status(500).json({
         success: false,
-        message: 'Failed to create admin user'
+        message: 'Failed to create admin user: ' + userError.message
       });
     }
 
- 
+    // Create user-organization relationship
     const { error: userOrgError } = await supabase
       .from('user_organizations')
       .insert({
@@ -378,25 +397,38 @@ router.post('/verify-otp', async (req, res) => {
 
     if (userOrgError) {
       console.error('User-org relationship error:', userOrgError);
+      // Clean up if association fails
+      await supabase.from('auth_users').delete().eq('id', userData.id);
+      await supabase.from('organizations').delete().eq('id', orgData.id);
+      
       return res.status(500).json({
         success: false,
-        message: 'Failed to associate user with organization'
+        message: 'Failed to associate user with organization: ' + userOrgError.message
       });
     }
 
+    // Create user session
+    const clientIP = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null;
+    const userAgent = req.get('User-Agent') || null;
 
     const { data: sessionData, error: sessionError } = await supabase.rpc('create_user_session', {
       p_user_id: userData.id,
       p_organization_id: orgData.id,
-      p_ip_address: req.ip,
-      p_user_agent: req.get('User-Agent')
+      p_ip_address: clientIP,
+      p_user_agent: userAgent
     });
 
     if (sessionError || !sessionData) {
       console.error('Session creation error:', sessionError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to create session'
+      // Don't clean up user/org for session errors, just return without session
+      return res.status(200).json({
+        success: true,
+        message: 'Organization created successfully but session creation failed. Please log in manually.',
+        data: {
+          organization: orgData,
+          user: userData,
+          sessionToken: null
+        }
       });
     }
 
@@ -414,7 +446,7 @@ router.post('/verify-otp', async (req, res) => {
     console.error('OTP verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error')
     });
   }
 });

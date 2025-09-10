@@ -396,27 +396,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const result = await response.json();
 
       if (result.success) {
+        // Handle session token (might be null if session creation failed)
+        if (result.data.sessionToken) {
+          localStorage.setItem('session_token', result.data.sessionToken);
+          
+          // Set user context if we have a session
+          setUser(result.data.user);
+          setOrganization(result.data.organization);
+          setUserRole('admin');
+          setIsAuthenticated(true);
 
-        localStorage.setItem('session_token', result.data.sessionToken);
+          localStorage.setItem('user_data', JSON.stringify(result.data.user));
+          localStorage.setItem('organization_data', JSON.stringify(result.data.organization));
+          localStorage.setItem('user_role', 'admin');
+          
+          toast({
+            title: "Organization Created",
+            description: "Your organization has been created successfully and you are now logged in!"
+          });
+        } else {
+          // Organization created but session failed
+          toast({
+            title: "Organization Created",
+            description: "Your organization has been created successfully. Please log in manually.",
+            variant: "default"
+          });
+        }
 
-
-        setUser(result.data.user);
-        setOrganization(result.data.organization);
-        setUserRole('admin');
-        setIsAuthenticated(true);
-
-
-        localStorage.setItem('user_data', JSON.stringify(result.data.user));
-        localStorage.setItem('organization_data', JSON.stringify(result.data.organization));
-        localStorage.setItem('user_role', 'admin');
-        
-
+        // Clean up pending data
         localStorage.removeItem('pending_org_data');
-
-        toast({
-          title: "Organization Created",
-          description: "Your organization has been created successfully and you are now logged in!"
-        });
 
         return { success: true };
       } else {
