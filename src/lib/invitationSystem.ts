@@ -79,7 +79,18 @@ const sendInvitationEmails = async (invitations: any[]) => {
 };
 
 export const generateInvitationLink = (token: string): string => {
-  const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+  // Use environment variable or current origin, with production fallback
+  let baseUrl = import.meta.env.VITE_APP_URL;
+  
+  if (!baseUrl && typeof window !== 'undefined') {
+    baseUrl = window.location.origin;
+  }
+  
+  // Production fallback
+  if (!baseUrl) {
+    baseUrl = 'https://ematdaan.vercel.app';
+  }
+  
   const encodedToken = encodeURIComponent(token);
   return `${baseUrl}/auth?invitation=${encodedToken}`;
 };

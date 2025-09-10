@@ -174,6 +174,27 @@ router.get('/validate/:token', async (req, res) => {
   }
 });
 
+// Debug endpoint to test invitation link generation
+router.get('/debug/test-link/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const testLink = generateInvitationLink(token);
+    
+    res.json({
+      token: token,
+      generatedLink: testLink,
+      baseUrl: process.env.VITE_APP_URL || process.env.FRONTEND_URL || 'https://ematdaan.vercel.app',
+      envVars: {
+        VITE_APP_URL: process.env.VITE_APP_URL || 'not set',
+        FRONTEND_URL: process.env.FRONTEND_URL || 'not set',
+        NODE_ENV: process.env.NODE_ENV
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
 // Test endpoint to check table structure
 router.get('/test', async (req, res) => {
   try {
@@ -247,8 +268,9 @@ const sendInvitationEmails = async (invitations: any[]) => {
 
 
 const generateInvitationLink = (token: string): string => {
-  const baseUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
-  return `${baseUrl}/auth?invitation=${token}`;
+  // Use the proper frontend URL for production
+  const baseUrl = process.env.VITE_APP_URL || process.env.FRONTEND_URL || 'https://ematdaan.vercel.app';
+  return `${baseUrl}/auth?invitation=${encodeURIComponent(token)}`;
 };
 
 

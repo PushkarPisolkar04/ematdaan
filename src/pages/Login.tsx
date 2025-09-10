@@ -76,16 +76,19 @@ const Login = () => {
 
     try {
       setValidatingInvitation(true);
+      console.log('Validating invitation token:', token);
       const validation = await invitationApi.validateInvitationToken(token);
+      console.log('Invitation validation result:', validation);
       setInvitationValidation(validation);
       
       if (validation.is_valid) {
         setJoinData(prev => ({ ...prev, email: validation.email }));
       }
     } catch (error) {
+      console.error('Invitation validation error:', error);
       setInvitationValidation({
         is_valid: false,
-        reason: 'Failed to validate invitation'
+        reason: error instanceof Error ? error.message : 'Failed to validate invitation'
       });
     } finally {
       setValidatingInvitation(false);
